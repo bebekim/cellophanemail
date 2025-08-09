@@ -1,0 +1,112 @@
+#+TITLE: CellophoneMail Development TODO
+#+AUTHOR: Claude Code
+#+DATE: 2025-01-08
+
+* COMPLETED ✅
+** DONE Complete feature/outbound-smtp-service branch (protectedtex)
+** DONE Create cellophanemail repository with Litestar + plugin architecture  
+** DONE Set up modern Python project structure with uv
+** DONE Add Litestar SaaS dependencies (auth, billing, etc.)
+** DONE Port core Four Horsemen business logic from protectedtex
+** DONE Switch from SQLAlchemy to Piccolo ORM
+   - Removed SQLAlchemy plugin from app.py
+   - Created piccolo_conf.py configuration file
+   - Updated .env files for Piccolo database URLs (sqlite for dev, postgresql for prod)
+** DONE Create Piccolo models for SaaS
+   - User model with auth, billing, preferences (Australia/Melbourne timezone)
+   - Organization model for multi-tenant SaaS
+   - EmailLog model for Four Horsemen analysis tracking
+   - Subscription model for Stripe billing integration
+
+* IN PROGRESS 🚧
+** TODO Test Piccolo migration and app startup
+   SCHEDULED: <2025-01-08>
+   - [ ] Run =piccolo migrations new cellophanemail --auto= to create initial migration
+   - [ ] Run =piccolo migrations forwards cellophanemail= to apply migration
+   - [ ] Test Litestar app startup with =uvicorn cellophanemail.app:app --reload=
+   - [ ] Verify database tables created correctly
+   - [ ] Test basic API endpoints (/health, /docs)
+
+* NEXT PHASE 📋
+** TODO Implement plugin system foundation
+   SCHEDULED: <2025-01-08>
+   - [ ] Create base plugin interface in =plugins/base/plugin.py=
+   - [ ] Define EmailMessage standardized format for all plugins
+   - [ ] Implement plugin loading/lifecycle in manager.py
+   - [ ] Add plugin registration system
+   - [ ] Test plugin manager initialization
+
+** TODO Create SMTP plugin from existing aiosmtpd code  
+   SCHEDULED: <2025-01-08>
+   - [ ] Port SMTP server code from protectedtex to =plugins/smtp/=
+   - [ ] Adapt to use plugin interface and EmailMessage format
+   - [ ] Integrate with Four Horsemen analyzer
+   - [ ] Add configuration for SMTP host/port settings
+   - [ ] Test local SMTP receiving and processing
+
+** TODO Build Postmark plugin for production SaaS
+   SCHEDULED: <2025-01-08>  
+   - [ ] Create webhook handler in =plugins/postmark/webhook.py=
+   - [ ] Parse Postmark inbound email format to EmailMessage
+   - [ ] Add Postmark API integration for outbound sending
+   - [ ] Implement webhook signature verification
+   - [ ] Test end-to-end Postmark flow
+
+* FUTURE PHASES 🔮
+** TODO Implement authentication system
+   - [ ] User registration/login endpoints
+   - [ ] JWT token management
+   - [ ] Password hashing with bcrypt
+   - [ ] Email verification flow
+
+** TODO Add Stripe billing integration
+   - [ ] Subscription webhook handlers
+   - [ ] Usage tracking and limits
+   - [ ] Payment method management
+   - [ ] Invoice generation
+
+** TODO Create Gmail API plugin
+   - [ ] OAuth2 integration
+   - [ ] Gmail API email fetching
+   - [ ] Real-time push notifications
+   - [ ] Email sending via Gmail API
+
+* ARCHITECTURE NOTES 📝
+** Plugin Architecture
+   All email input methods (SMTP, Postmark, Gmail API) use standardized:
+   - EmailMessage format for consistent processing
+   - Plugin interface for lifecycle management
+   - Four Horsemen analysis pipeline
+   - Async processing for scalability
+
+** SaaS Multi-tenancy
+   - Organization-based isolation
+   - User roles and permissions
+   - Usage tracking and billing
+   - Australia/Melbourne timezone default
+
+** Database Strategy
+   - Piccolo ORM for native async operations
+   - SQLite for development
+   - PostgreSQL for production
+   - Migration system for schema updates
+
+* COMMANDS TO RUN 🚀
+When switching to cellophanemail repository:
+
+#+BEGIN_SRC bash
+# Setup environment
+cd ~/repositories/individuals/cellophanemail
+source .venv/bin/activate
+
+# Database setup  
+piccolo migrations new cellophanemail --auto
+piccolo migrations forwards cellophanemail
+
+# Test application
+uvicorn cellophanemail.app:app --reload --host 127.0.0.1 --port 8000
+
+# Verify endpoints
+curl http://localhost:8000/health
+curl http://localhost:8000/docs
+#+END_SRC

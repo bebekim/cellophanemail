@@ -1,0 +1,56 @@
+#!/bin/bash
+# SMTP Email Server Development Script
+# Runs only the aiosmtpd email processing server
+
+# Load environment variables from .env file
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+fi
+
+export CELLOPHANEMAIL_ENV=development
+export DATABASE_URL="postgresql://postgres:password@localhost:5432/cellophanemail"
+export PYTHONPATH="src:${PYTHONPATH}"
+export DEBUG=1
+export SMTP_HOST="localhost"
+export SMTP_PORT="2525"
+
+echo "📧 Starting SMTP Email Server (Development)"
+echo "   SMTP Port: 2525 (development)"
+echo "   Environment: development"
+echo "   Database: postgresql://postgres:password@localhost:5432/cellophanemail"
+echo "   Processing emails with Four Horsemen AI analysis"
+echo ""
+
+# Check if PostgreSQL is running
+echo "🗄️  Checking database connection..."
+if ! pg_isready -h localhost -p 5432 > /dev/null 2>&1; then
+    echo "❌ PostgreSQL is not running on localhost:5432"
+    echo "   Please start PostgreSQL first"
+    exit 1
+fi
+
+# Check if port 2525 is already in use
+if lsof -Pi :2525 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "❌ Port 2525 is already in use"
+    echo "   Use ./bin/kill to stop existing services"
+    exit 1
+fi
+
+echo "ℹ️  Note: This runs email server only"
+echo "   Web API is NOT available"
+echo "   To test: Send emails to localhost:2525"
+echo "   To access API: Also run ./bin/dev-litestar"
+echo ""
+
+echo "🚀 Starting SMTP server..."
+echo "   Press Ctrl+C to stop"
+echo ""
+
+# Run SMTP server only
+uv run python -c "
+import sys
+sys.path.insert(0, 'src')
+import asyncio
+from cellophanemail.plugins.smtp.server import main
+asyncio.run(main())
+"

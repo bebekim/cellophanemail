@@ -1,0 +1,41 @@
+[project]
+name = "cellophanemail"
+version = "0.1.0"
+description = "CellophoneMail - AI-powered email protection SaaS with Four Horsemen analysis"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "uvicorn[standard]>=0.24.0", # Database migrations
+    # Authentication & Security
+    "pydantic[email]>=2.5.3",
+    "pydantic-settings>=2.1.0",
+    "python-jose[cryptography]>=3.3.0", # JWT handling
+    "passlib[bcrypt]>=1.7.4", # Password hashing
+    # Email & Communication
+    "aiosmtplib>=3.0.1", # Async SMTP client
+    "anthropic>=0.8.1", # AI content analysis
+    "httpx>=0.26.0", # HTTP client for webhooks
+    # SaaS Features
+    "stripe>=7.8.0", # Billing integration
+    "redis>=5.0.1", # Caching & rate limiting
+    "celery>=5.3.4", # Background tasks
+    # Development & Testing
+    "pytest>=8.4.1",
+    "pytest-asyncio>=0.23.2",
+    "pytest-mock>=3.14.1",
+    "black>=23.12.1",
+    "ruff>=0.1.8",
+    "email-validator>=2.2.0",
+    "piccolo[postgres]>=1.28.0",
+    "litestar[standard]>=2.16.0",
+    "aiosmtpd>=1.4.6",
+    "pyjwt>=2.10.1",
+    "cryptography>=45.0.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest-cov>=4.1.0",
+    "pre-commit>=3.6.0",
+    "mypy>=1.8.0",
+]

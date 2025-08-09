@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+# Development script to run both Litestar API and SMTP server
+# Convenient for full local testing
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${GREEN}🚀 Starting CellophoneMail Full Stack${NC}"
+echo -e "${BLUE}This will start both Litestar API and SMTP server${NC}"
+
+# Function to cleanup on exit
+cleanup() {
+    echo -e "\n${YELLOW}🛑 Shutting down services...${NC}"
+    # Kill all child processes
+    jobs -p | xargs -r kill 2>/dev/null || true
+    wait
+    echo -e "${GREEN}✅ All services stopped${NC}"
+}
+
+# Set up trap to cleanup on script exit
+trap cleanup EXIT INT TERM
+
+# Check if virtual environment exists
+if [ ! -d ".venv" ]; then
+    echo -e "${YELLOW}⚠️  Virtual environment not found. Creating one...${NC}"
+    uv venv
+fi
+
+# Check if PostgreSQL is running
+if ! pg_isready -h localhost -p 5432 > /dev/null 2>&1; then
+    echo -e "${RED}❌ PostgreSQL is not running on localhost:5432${NC}"
+    echo -e "${YELLOW}Please start PostgreSQL first${NC}"
+    exit 1
+fi
+
+# Make scripts executable
+chmod +x ./bin/dev-litestar
+chmod +x ./bin/dev-smtp
+
+# Start Litestar API server in background
+echo -e "${BLUE}Starting Litestar API server...${NC}"
+./bin/dev-litestar &
+LITESTAR_PID=$!
+
+# Wait a bit for Litestar to start
+sleep 3
+
+# Start SMTP server in background
+echo -e "${BLUE}Starting SMTP server...${NC}"
+./bin/dev-smtp &
+SMTP_PID=$!
+
+# Wait a bit for SMTP to start
+sleep 2
+
+echo -e "${GREEN}============================================${NC}"
+echo -e "${GREEN}✅ All services are running!${NC}"
+echo -e "${GREEN}============================================${NC}"
+echo -e "${YELLOW}📖 API Server: http://localhost:8000${NC}"
+echo -e "${YELLOW}📖 API Docs: http://localhost:8000/schema${NC}"
+echo -e "${YELLOW}📧 SMTP Server: localhost:2525${NC}"
+echo -e "${GREEN}============================================${NC}"
+echo -e "${BLUE}Press Ctrl+C to stop all services${NC}"
+
+# Wait for both processes
+wait $LITESTAR_PID $SMTP_PID

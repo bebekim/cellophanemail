@@ -1,0 +1,59 @@
+#!/bin/bash
+# Litestar Web Server Development Script
+# Runs only the Litestar web API server
+
+export CELLOPHANEMAIL_ENV=development
+export LITESTAR_PORT=8000
+export DATABASE_URL="postgresql://postgres:password@localhost:5432/cellophanemail"
+export PYTHONPATH="src:${PYTHONPATH}"
+export DEBUG=1
+
+echo "🌍 Starting Litestar Web Server (Development)"
+echo "   API Server: http://localhost:${LITESTAR_PORT}"
+echo "   API Docs: http://localhost:${LITESTAR_PORT}/schema"
+echo "   Environment: development"
+echo "   Database: postgresql://postgres:password@localhost:5432/cellophanemail"
+echo ""
+
+# Check if PostgreSQL is running
+echo "🗄️  Checking database connection..."
+if ! pg_isready -h localhost -p 5432 > /dev/null 2>&1; then
+    echo "❌ PostgreSQL is not running on localhost:5432"
+    echo "   Please start PostgreSQL first"
+    exit 1
+fi
+
+# Check if port 8000 is already in use
+if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "❌ Port 8000 is already in use"
+    echo "   Use ./bin/kill to stop existing services"
+    exit 1
+fi
+
+# Ensure database migrations are applied
+echo "🗄️  Checking database setup..."
+PYTHONPATH=src uv run piccolo migrations forwards cellophanemail
+
+if [ $? -eq 0 ]; then
+    echo "✅ Database migrations applied"
+    echo ""
+else
+    echo "⚠️  Database migration failed, continuing anyway..."
+    echo ""
+fi
+
+echo "ℹ️  Note: This runs API server only"
+echo "   SMTP email processing is NOT running"
+echo "   To process emails: Also run ./bin/dev-smtp"
+echo ""
+
+echo "🚀 Starting Litestar server..."
+echo "   Press Ctrl+C to stop"
+echo ""
+
+# Run Litestar server only
+uv run uvicorn src.cellophanemail.app:app \
+    --host 0.0.0.0 \
+    --port ${LITESTAR_PORT} \
+    --reload \
+    --log-level info

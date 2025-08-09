@@ -1,0 +1,21 @@
+#!/bin/bash
+# Start ngrok tunnels for CellophoneMail development
+# Starts both SMTP (TCP) and Litestar (HTTP) tunnels with static domains
+
+echo "🚀 Starting ngrok tunnels for CellophoneMail..."
+echo "   SMTP Server: tcp://1.tcp.au.ngrok.io:20674 (port 2525)"
+echo "   Litestar API: https://especially-loved-goshawk.ngrok-free.app (port 8000)"
+echo ""
+echo "🔧 Note: HTTP domain shared with garasade - run one project at a time"
+echo "📝 Note: Updated for Litestar port 8000 (not Flask port 5001)"
+echo ""
+
+# Kill any existing ngrok processes to avoid conflicts
+pkill ngrok 2>/dev/null
+sleep 1
+
+# Start both tunnels using the configuration file
+echo "🌐 Starting both tunnels..."
+ngrok start cellophanemail-smtp cellophanemail-web
+
+# Note: This will run in foreground, press Ctrl+C to stop all tunnels
