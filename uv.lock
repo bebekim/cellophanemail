@@ -237,6 +237,7 @@ dependencies = [
     { name = "litestar", extra = ["standard"] },
     { name = "passlib", extra = ["bcrypt"] },
     { name = "piccolo", extra = ["postgres"] },
+    { name = "postmark" },
     { name = "pydantic", extra = ["email"] },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
@@ -271,6 +272,7 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
     { name = "piccolo", extras = ["postgres"], specifier = ">=1.28.0" },
+    { name = "postmark", specifier = ">=1.0.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.6.0" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.5.3" },
     { name = "pydantic-settings", specifier = ">=2.1.0" },
@@ -1156,6 +1158,18 @@ sdist = { url = "https://files.pythonhosted.org/packages/ea/21/0b1a08bd4ab7d4685
 wheels = [
     { url = "https://files.pythonhosted.org/packages/12/8d/245e02e6ff1f046f70636dc62380ea73b03ab1d7f1fdcf61cbe26bc9c030/polyfactory-2.22.1-py3-none-any.whl", hash = "sha256:7500ee3678d9bc25347c0a73a35d3711cfcf9c7f45ad56d0bb085e9f75ecae7a", size = 63547 },
 ]
+
+[[package]]
+name = "postmark"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "python-dateutil" },
+    { name = "six" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c1/69/943f23ce20b1456488f7069545560e00a39f7161efcd0db3698c3666c909/postmark-1.0.0.tar.gz", hash = "sha256:b8775f6519bfdc0b944378f6e1d2efcc68596c9536fc57bb6ca1db456d8572e4", size = 61436 }
 
 [[package]]
 name = "pre-commit"
