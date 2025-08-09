@@ -1,8 +1,43 @@
 """Content processor for email analysis orchestration."""
 
-from typing import Dict
-from flask import current_app
-from app.core.content_analyzer import ContentAnalysisService
+from typing import Dict, Optional, List
+from dataclasses import dataclass
+from uuid import UUID
+from .content_analyzer import ContentAnalysisService
+from .email_message import EmailMessage
+
+
+@dataclass
+class AnalysisResult:
+    """Structured result from content analysis."""
+    classification: str  # SAFE, WARNING, HARMFUL, ABUSIVE
+    horsemen_detected: List[str]
+    reasoning: str
+    specific_examples: List[str]
+    confidence_score: float = 1.0
+
+
+@dataclass
+class ProcessingContext:
+    """Context information for email processing."""
+    organization_id: Optional[UUID] = None
+    user_id: Optional[UUID] = None
+    source_plugin: str = "unknown"
+    processing_rules: Dict[str, any] = None
+    
+    def __post_init__(self):
+        if self.processing_rules is None:
+            self.processing_rules = {}
+
+
+@dataclass
+class EmailProcessingResult:
+    """Complete result of email content processing."""
+    should_forward: bool
+    analysis: AnalysisResult
+    filtered_content: Optional[str] = None
+    block_reason: Optional[str] = None
+    toxicity_score: float = 0.0
 
 
 class ContentProcessor:
@@ -51,7 +86,31 @@ class ContentProcessor:
         
         return self.analyzer.analyze_content(email_content, sender_email)
     
-    def _generate_filtered_content(self, parsed_email_data: Dict, analysis_result: Dict) -> str:
-        """Generate filtered content based on analysis results."""
-        # Minimal implementation - just return summary for now
-        return f"[SUMMARY] Email from {parsed_email_data.get('original_sender', 'unknown')} - Content filtered for protection"
+    # Legacy method for backwards compatibility
+    def process_email(self, user_id: int, parsed_email_data: Dict, raw_email_content: str) -> Dict:
+        """Legacy method - converts old interface to new one."""
+        # Convert old format to new EmailMessage (simplified)
+        from uuid import uuid4
+        
+        email = EmailMessage(
+            id=uuid4(),
+            from_address=parsed_email_data.get('original_sender', ''),
+            to_addresses=[parsed_email_data.get('recipient', '')],
+            subject=parsed_email_data.get('subject', ''),
+            text_content=parsed_email_data.get('original_body', ''),
+            html_content=None,
+            message_id=parsed_email_data.get('message_id', ''),
+            received_at=None
+        )
+        
+        context = ProcessingContext(user_id=UUID(int=user_id) if user_id else None)
+        result = self.process_email_content(email, context)
+        
+        # Convert back to old format
+        return {
+            'ai_classification': result.analysis.classification,
+            'filtered_content': result.filtered_content,
+            'horsemen_detected': result.analysis.horsemen_detected,
+            'reasoning': result.analysis.reasoning,
+            'specific_examples': result.analysis.specific_examples
+        }

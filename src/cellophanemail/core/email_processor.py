@@ -8,7 +8,8 @@ from datetime import datetime
 from uuid import UUID
 
 from .email_message import EmailMessage
-from .content_analyzer import ContentAnalyzer
+from .content_processor import ContentProcessor, ProcessingContext, EmailProcessingResult
+from .email_delivery import EmailSenderFactory
 from ..models.email_log import EmailLog
 from ..models.organization import Organization
 from ..models.user import User
@@ -37,9 +38,20 @@ class ProcessingResult:
 class EmailProcessor:
     """Main email processing pipeline."""
     
-    def __init__(self):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize the email processor."""
-        self.analyzer = ContentAnalyzer()
+        self.content_processor = ContentProcessor()
+        self.config = config or {}
+        
+        # Initialize email sender if configuration is provided
+        self.email_sender = None
+        if self.config:
+            sender_type = self.config.get('EMAIL_DELIVERY_METHOD', 'smtp')
+            try:
+                self.email_sender = EmailSenderFactory.create_sender(sender_type, self.config)
+                logger.info(f"Initialized {sender_type} email sender")
+            except Exception as e:
+                logger.warning(f"Failed to initialize email sender: {e}. Email forwarding will be disabled.")
         
     async def process(self, email_message: EmailMessage) -> ProcessingResult:
         """Process an email through the Four Horsemen analysis pipeline."""
@@ -64,14 +76,17 @@ class EmailProcessor:
                         block_reason="Organization email limit exceeded"
                     )
             
-            # Step 3: Perform Four Horsemen analysis
-            analysis_result = self.analyzer.analyze_content(
-                content=email_message.text_content or email_message.html_content,
-                sender=email_message.from_address
+            # Step 3: Process email content through ContentProcessor
+            context = ProcessingContext(
+                organization_id=org_id,
+                user_id=user_id,
+                source_plugin=email_message.source_plugin or "unknown"
             )
             
-            # Step 4: Determine if email should be forwarded
-            should_forward = self._should_forward_email(analysis_result)
+            processing_result = self.content_processor.process_email_content(email_message, context)
+            
+            # Step 4: Extract forwarding decision from processing result
+            should_forward = processing_result.should_forward
             
             # Step 5: Log the email processing
             processing_time = (datetime.now() - start_time).total_seconds() * 1000
@@ -80,10 +95,10 @@ class EmailProcessor:
                 result=ProcessingResult(
                     email_id=email_message.id,
                     should_forward=should_forward,
-                    block_reason=None if should_forward else "Four Horsemen detected",
-                    toxicity_score=self._calculate_toxicity_score(analysis_result),
-                    horsemen_detected=analysis_result.get("horsemen_detected", []),
-                    ai_analysis=analysis_result,
+                    block_reason=processing_result.block_reason,
+                    toxicity_score=processing_result.toxicity_score,
+                    horsemen_detected=processing_result.analysis.horsemen_detected,
+                    ai_analysis=self._convert_analysis_to_dict(processing_result.analysis),
                     processing_time_ms=processing_time
                 )
             )
@@ -95,10 +110,10 @@ class EmailProcessor:
             return ProcessingResult(
                 email_id=email_message.id,
                 should_forward=should_forward,
-                block_reason=None if should_forward else "Content filtered by Four Horsemen analysis",
-                toxicity_score=self._calculate_toxicity_score(analysis_result),
-                horsemen_detected=analysis_result.get("horsemen_detected", []),
-                ai_analysis=analysis_result,
+                block_reason=processing_result.block_reason,
+                toxicity_score=processing_result.toxicity_score,
+                horsemen_detected=processing_result.analysis.horsemen_detected,
+                ai_analysis=self._convert_analysis_to_dict(processing_result.analysis),
                 processing_time_ms=processing_time
             )
             
@@ -143,42 +158,15 @@ class EmailProcessor:
             logger.error(f"Error checking organization limits: {e}")
             return False
     
-    def _calculate_toxicity_score(self, analysis_result: Dict[str, Any]) -> float:
-        """Calculate toxicity score from analysis result."""
-        classification = analysis_result.get("classification", "SAFE")
-        horsemen_count = len(analysis_result.get("horsemen_detected", []))
-        
-        # Convert classification to numeric score
-        score_map = {
-            "SAFE": 0.0,
-            "WARNING": 0.3,
-            "HARMFUL": 0.7,
-            "ABUSIVE": 1.0
+    def _convert_analysis_to_dict(self, analysis) -> Dict[str, Any]:
+        """Convert AnalysisResult dataclass to dict for logging compatibility."""
+        return {
+            'classification': analysis.classification,
+            'horsemen_detected': analysis.horsemen_detected,
+            'reasoning': analysis.reasoning,
+            'specific_examples': analysis.specific_examples,
+            'confidence_score': analysis.confidence_score
         }
-        
-        base_score = score_map.get(classification, 0.0)
-        
-        # Adjust based on horsemen count
-        if horsemen_count > 0:
-            base_score = max(base_score, 0.5 + (horsemen_count * 0.1))
-            
-        return min(base_score, 1.0)
-
-    def _should_forward_email(self, analysis_result: Dict[str, Any]) -> bool:
-        """Determine if email should be forwarded based on analysis."""
-        # Check toxicity threshold
-        toxicity_score = self._calculate_toxicity_score(analysis_result)
-        if toxicity_score > 0.7:  # Configurable threshold
-            return False
-            
-        # Check for Four Horsemen
-        horsemen = analysis_result.get("horsemen_detected", [])
-        if len(horsemen) > 0:
-            # Could have more nuanced logic here
-            # For now, block if any horseman detected
-            return False
-            
-        return True
     
     async def _log_email(self, email_message: EmailMessage, result: ProcessingResult):
         """Log email processing to database."""
@@ -209,7 +197,39 @@ class EmailProcessor:
     
     async def _forward_email(self, email_message: EmailMessage):
         """Forward approved email to recipients."""
-        # This will be implemented with actual email sending logic
-        # For now, just log
-        logger.info(f"Would forward email {email_message.id} to {email_message.to_addresses}")
-        # TODO: Implement actual forwarding via SMTP or API
+        if not self.email_sender:
+            logger.warning(f"No email sender configured, cannot forward email {email_message.id}")
+            return
+        
+        # Prepare AI result - since email reached here, it passed filtering (SAFE)
+        ai_result = {'ai_classification': 'SAFE'}
+        
+        # Prepare original email data
+        original_email_data = {
+            'original_subject': email_message.subject or 'No Subject',
+            'original_sender': email_message.from_address,
+            'original_body': email_message.text_content or email_message.html_content or 'No content',
+            'message_id': email_message.message_id,
+            'content': email_message.text_content or email_message.html_content or 'No content'
+        }
+        
+        # Send to each recipient
+        successful_sends = 0
+        for to_address in email_message.to_addresses:
+            try:
+                success = await self.email_sender.send_filtered_email(
+                    recipient_shield_address=to_address,
+                    ai_result=ai_result,
+                    original_email_data=original_email_data
+                )
+                
+                if success:
+                    successful_sends += 1
+                    logger.info(f"Successfully forwarded email {email_message.id} to {to_address}")
+                else:
+                    logger.error(f"Failed to forward email {email_message.id} to {to_address}")
+                    
+            except Exception as e:
+                logger.error(f"Error forwarding email {email_message.id} to {to_address}: {e}", exc_info=True)
+        
+        logger.info(f"Forwarded email {email_message.id} to {successful_sends}/{len(email_message.to_addresses)} recipients")

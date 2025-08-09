@@ -181,13 +181,17 @@ IMPORTANT:
                         detected_horsemen.append(horseman)
                     specific_examples.append(f"{horseman}: contains '{keyword}'")
         
-        # Classification based on Four Horsemen presence
+        # Apply Four Horsemen-based classification logic
+        # Multiple horsemen or contempt (most destructive) = ABUSIVE
         if len(detected_horsemen) >= 2 or 'contempt' in detected_horsemen:
             classification = 'ABUSIVE'
+        # Single horseman detected = HARMFUL
         elif len(detected_horsemen) == 1:
             classification = 'HARMFUL'
+        # Some concerning patterns but no clear horsemen = WARNING
         elif specific_examples:
             classification = 'WARNING'
+        # No concerning patterns detected = SAFE
         else:
             classification = 'SAFE'
         
@@ -199,5 +203,6 @@ IMPORTANT:
         }
 
 
-# Backwards compatibility alias for EmailProcessor
+# Backwards compatibility alias for EmailProcessor and other legacy code
+# Maintains API compatibility while using the new ContentAnalysisService class
 ContentAnalyzer = ContentAnalysisService
