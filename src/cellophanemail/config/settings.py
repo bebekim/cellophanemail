@@ -65,6 +65,20 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = Field(default=True, description="Use TLS for SMTP")
     email_username: str = Field(description="Email username")
     email_password: str = Field(description="Email password")
+    smtp_domain: str = Field(default="cellophanemail.com", description="Service domain for email")
+    
+    # Outbound email delivery settings
+    email_delivery_method: str = Field(
+        default="smtp", 
+        description="Email delivery method: 'smtp' or 'postmark'"
+    )
+    outbound_smtp_host: str = Field(default="smtp.gmail.com", description="Outbound SMTP host")
+    outbound_smtp_port: int = Field(default=587, description="Outbound SMTP port")
+    outbound_smtp_use_tls: bool = Field(default=True, description="Use TLS for outbound SMTP")
+    
+    # Postmark settings
+    postmark_api_token: str = Field(default="", description="Postmark API token")
+    postmark_from_email: str = Field(default="", description="Default from email for Postmark")
     
     # Plugin settings
     enabled_plugins: List[str] = Field(
@@ -82,6 +96,22 @@ class Settings(BaseSettings):
         return {
             "database_url": self.database_url,
             "app_name": "cellophanemail",
+        }
+    
+    @property
+    def email_delivery_config(self):
+        """Email delivery configuration for EmailSenderFactory."""
+        return {
+            'EMAIL_DELIVERY_METHOD': self.email_delivery_method,
+            'SMTP_DOMAIN': self.smtp_domain,
+            'EMAIL_USERNAME': self.email_username,
+            'EMAIL_PASSWORD': self.email_password,
+            'OUTBOUND_SMTP_HOST': self.outbound_smtp_host,
+            'OUTBOUND_SMTP_PORT': self.outbound_smtp_port,
+            'OUTBOUND_SMTP_USE_TLS': self.outbound_smtp_use_tls,
+            'POSTMARK_API_TOKEN': self.postmark_api_token,
+            'POSTMARK_FROM_EMAIL': self.postmark_from_email or f'noreply@{self.smtp_domain}',
+            'SERVICE_CONSTANTS': {}
         }
 
 

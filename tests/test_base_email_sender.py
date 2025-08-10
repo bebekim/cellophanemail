@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import Mock
-from src.cellophanemail.core.email_delivery.base import BaseEmailSender
+from cellophanemail.core.email_delivery.base import BaseEmailSender
 
 
 class TestBaseEmailSender:
@@ -174,16 +174,15 @@ class TestSendFilteredEmailIntegration:
                 super().__init__(service_domain, username)
                 self.sent_messages_list = sent_messages_list
             
-            async def send_email(self, msg, recipient):
+            async def send_email(self, to_address, subject, content, headers):
                 """Mock implementation that captures sent messages."""
                 self.sent_messages_list.append({
-                    'msg': msg,
-                    'recipient': recipient,
-                    'subject': msg['Subject'],
-                    'to': msg['To'],
-                    'from': msg['From']
+                    'to_address': to_address,
+                    'subject': subject,
+                    'content': content,
+                    'headers': headers
                 })
-                return "mock_send_result"
+                return True
         
         self.sender = TestableEmailSender(
             service_domain='cellophanemail.com',
@@ -214,15 +213,19 @@ class TestSendFilteredEmailIntegration:
         sent_msg = self.sent_messages[0]
         
         # Check recipient and subject
-        assert sent_msg['to'] == 'goldenfermi@gmail.com'
+        assert sent_msg['to_address'] == 'goldenfermi@gmail.com'
         assert sent_msg['subject'] == 'Good news!'
         
+        # Check content includes original body and footer
+        assert 'Great job on the project!' in sent_msg['content']
+        assert 'Protected by CellophoneMail Email Protection Service' in sent_msg['content']
+        
         # Check that message has proper headers
-        msg = sent_msg['msg']
-        assert 'Message-ID' in msg
-        assert 'In-Reply-To' in msg
-        assert msg['In-Reply-To'] == '<abc123@company.com>'
-        assert 'CellophoneMail Shield' in msg['From']
+        headers = sent_msg['headers']
+        assert 'Message-ID' in headers
+        assert 'In-Reply-To' in headers
+        assert headers['In-Reply-To'] == '<abc123@company.com>'
+        assert 'CellophoneMail Shield' in headers['From']
     
     def test_send_filtered_email_harmful_classification(self):
         """RED: Test complete flow for harmful email."""
@@ -248,4 +251,10 @@ class TestSendFilteredEmailIntegration:
         sent_msg = self.sent_messages[0]
         
         assert sent_msg['subject'] == '[Filtered] You are incompetent'
-        assert sent_msg['to'] == 'goldenfermi@gmail.com'
+        assert sent_msg['to_address'] == 'goldenfermi@gmail.com'
+        
+        # Check content includes filtering message
+        content = sent_msg['content']
+        assert '⚠️ Email filtered by CellophoneMail' in content
+        assert 'Original sender: toxic@example.com' in content
+        assert 'Detected: criticism, contempt' in content

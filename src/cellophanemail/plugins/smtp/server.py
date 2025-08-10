@@ -67,8 +67,15 @@ class SMTPServerRunner:
         """Start the SMTP server."""
         logger.info(f"Starting SMTP server on {self.host}:{self.port}")
         
+        # Create email processor with delivery configuration
+        from cellophanemail.config.settings import get_settings
+        settings = get_settings()
+        email_config = settings.email_delivery_config
+        
+        processor = EmailProcessor(email_delivery_config=email_config)
+        
         # Create handler and controller
-        handler = SMTPHandler()
+        handler = SMTPHandler(processor=processor)
         self.controller = Controller(
             handler,
             hostname=self.host,

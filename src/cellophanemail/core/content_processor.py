@@ -114,3 +114,92 @@ class ContentProcessor:
             'reasoning': result.analysis.reasoning,
             'specific_examples': result.analysis.specific_examples
         }
+    
+    def process_email_content(self, email_message, context: ProcessingContext) -> EmailProcessingResult:
+        """
+        Process email content through Four Horsemen analysis.
+        
+        Args:
+            email_message: EmailMessage object containing email data
+            context: ProcessingContext with user/organization info
+            
+        Returns:
+            EmailProcessingResult: Complete processing result with analysis and decision
+        """
+        # Extract content for analysis
+        content = email_message.text_content or email_message.html_content or ""
+        sender = email_message.from_address or "unknown"
+        
+        # Perform Four Horsemen analysis
+        analysis_dict = self.analyzer.analyze_content(content, sender)
+        
+        # Convert dict to AnalysisResult object
+        analysis = AnalysisResult(
+            classification=analysis_dict.get('classification', 'SAFE'),
+            horsemen_detected=analysis_dict.get('horsemen_detected', []),
+            reasoning=analysis_dict.get('reasoning', ''),
+            specific_examples=analysis_dict.get('specific_examples', []),
+            confidence_score=analysis_dict.get('confidence_score', 1.0)
+        )
+        
+        # Calculate toxicity score
+        toxicity_score = self._calculate_toxicity_score(analysis)
+        
+        # Determine if email should be forwarded
+        should_forward = self._should_forward_email(analysis, toxicity_score)
+        
+        # Generate block reason if needed
+        block_reason = None if should_forward else self._generate_block_reason(analysis)
+        
+        return EmailProcessingResult(
+            should_forward=should_forward,
+            analysis=analysis,
+            filtered_content=None,  # Could implement content filtering here
+            block_reason=block_reason,
+            toxicity_score=toxicity_score
+        )
+    
+    def _calculate_toxicity_score(self, analysis) -> float:
+        """Calculate toxicity score from analysis result."""
+        classification = analysis.classification
+        horsemen_count = len(analysis.horsemen_detected)
+        
+        # Convert classification to numeric score
+        score_map = {
+            "SAFE": 0.0,
+            "WARNING": 0.3,
+            "HARMFUL": 0.7,
+            "ABUSIVE": 1.0
+        }
+        
+        base_score = score_map.get(classification, 0.0)
+        
+        # Adjust based on horsemen count
+        if horsemen_count > 0:
+            base_score = max(base_score, 0.5 + (horsemen_count * 0.1))
+            
+        return min(base_score, 1.0)
+    
+    def _should_forward_email(self, analysis, toxicity_score: float) -> bool:
+        """Determine if email should be forwarded based on analysis."""
+        # Check toxicity threshold
+        if toxicity_score > 0.7:  # Configurable threshold
+            return False
+            
+        # Check for Four Horsemen
+        if len(analysis.horsemen_detected) > 0:
+            # For now, block if any horseman detected
+            return False
+            
+        return True
+    
+    def _generate_block_reason(self, analysis) -> str:
+        """Generate human-readable block reason."""
+        if analysis.horsemen_detected:
+            horsemen = ', '.join(analysis.horsemen_detected)
+            return f"Content filtered by Four Horsemen analysis: {horsemen}"
+        
+        if analysis.classification in ['HARMFUL', 'ABUSIVE']:
+            return f"Content classified as {analysis.classification}"
+        
+        return "Content blocked by safety filters"

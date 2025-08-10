@@ -144,30 +144,24 @@ Protected by CellophoneMail Email Protection Service"""
         # Format email based on AI classification
         subject, content = self.format_email_content(ai_result, original_email_data)
         
-        # Create email message
-        msg = MIMEText(content)
-        msg['To'] = real_email
-        msg['Subject'] = subject
-        
-        # Add threading headers to preserve Gmail conversation view
+        # Build threading headers to preserve Gmail conversation view
         threading_headers = self.build_threading_headers(original_email_data)
-        for header, value in threading_headers.items():
-            msg[header] = value
         
-        # Add anti-spoofing headers (never spoof the From address)
+        # Build anti-spoofing headers (never spoof the From address)
         thread_id = uuid.uuid4().hex[:8]  # Generate thread ID for this conversation
         original_sender = original_email_data.get('original_sender', 'unknown')
         anti_spoofing_headers = self.build_anti_spoofing_headers(
             original_sender=original_sender,
             thread_id=thread_id
         )
-        for header, value in anti_spoofing_headers.items():
-            msg[header] = value
+        
+        # Combine all headers
+        headers = {**threading_headers, **anti_spoofing_headers}
         
         # Send via the concrete implementation's send_email method
-        return await self.send_email(msg, real_email)
+        return await self.send_email(real_email, subject, content, headers)
     
     @abstractmethod
-    async def send_email(self, msg, recipient):
+    async def send_email(self, to_address, subject, content, headers):
         """Abstract method for sending email - must be implemented by subclasses."""
         pass
