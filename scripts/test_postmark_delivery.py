@@ -5,6 +5,7 @@ import asyncio
 import sys
 import os
 from pathlib import Path
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -13,6 +14,7 @@ from cellophanemail.config.settings import get_settings
 from cellophanemail.core.email_delivery import EmailSenderFactory
 
 
+@pytest.mark.asyncio
 async def test_postmark_connection():
     """Test basic Postmark connection and email sending."""
     print("🧪 Testing Postmark Email Delivery")
@@ -70,6 +72,7 @@ async def test_postmark_connection():
         traceback.print_exc()
 
 
+@pytest.mark.asyncio
 async def test_harmful_email():
     """Test sending a HARMFUL email (should show filtered message)."""
     print("\n" + "=" * 50)
