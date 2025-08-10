@@ -143,7 +143,7 @@ class TestCompleteEmailFlow:
             assert payload['Subject'] == 'Hello from friend'
             assert 'This is a friendly email message.' in payload['TextBody']
             assert 'Protected by CellophoneMail Email Protection Service' in payload['TextBody']
-            assert payload['From'] == 'noreply@cellophanemail.com'
+            assert payload['From'] == 'CellophoneMail Shield <noreply@cellophanemail.com>'
     
     @pytest.mark.asyncio
     async def test_harmful_email_blocked_no_forwarding(self, smtp_config, sample_email_message):
