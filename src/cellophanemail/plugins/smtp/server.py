@@ -72,7 +72,7 @@ class SMTPServerRunner:
         settings = get_settings()
         email_config = settings.email_delivery_config
         
-        processor = EmailProcessor(email_delivery_config=email_config)
+        processor = EmailProcessor(config=email_config)
         
         # Create handler and controller
         handler = SMTPHandler(processor=processor)
