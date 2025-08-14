@@ -57,6 +57,44 @@ class EmailMessage:
         }
     
     @classmethod
+    def from_postmark_webhook(cls, webhook_data: Dict[str, Any]) -> "EmailMessage":
+        """Create EmailMessage from Postmark webhook payload."""
+        # Process Headers from Postmark format (robust against malformed data)
+        headers = {}
+        if "Headers" in webhook_data and webhook_data["Headers"]:
+            for header in webhook_data["Headers"]:
+                # Skip None, non-dict, or malformed headers
+                if header and isinstance(header, dict) and "Name" in header and "Value" in header:
+                    headers[header["Name"]] = header["Value"]
+        
+        # Process Attachments from Postmark format
+        attachments = []
+        if "Attachments" in webhook_data and webhook_data["Attachments"]:
+            for attachment in webhook_data["Attachments"]:
+                attachments.append({
+                    "name": attachment.get("Name", ""),
+                    "content_type": attachment.get("ContentType", ""),
+                    "content_length": attachment.get("ContentLength", 0),
+                    "content": attachment.get("Content", "")  # Base64 encoded
+                })
+        
+        # Parse To field to get all recipients (handle comma-separated)
+        to_field = webhook_data.get("To", "")
+        to_addresses = [addr.strip() for addr in to_field.split(",") if addr.strip()] if to_field else []
+        
+        return cls(
+            from_address=webhook_data.get("From", ""),
+            to_addresses=to_addresses,
+            subject=webhook_data.get("Subject", ""),
+            message_id=webhook_data.get("MessageID", ""),
+            text_content=webhook_data.get("TextBody") or "",  # Handle None by converting to empty string
+            html_content=webhook_data.get("HtmlBody") or "",  # Handle None by converting to empty string
+            headers=headers,
+            attachments=attachments,
+            source_plugin="postmark"
+        )
+    
+    @classmethod
     def from_smtp_envelope(cls, envelope, message_data: bytes, source: str = "smtp") -> "EmailMessage":
         """Create EmailMessage from SMTP envelope and data."""
         import email
