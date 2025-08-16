@@ -6,13 +6,19 @@ echo "🚀 Starting ngrok tunnels for CellophoneMail..."
 echo "   SMTP Server: tcp://1.tcp.au.ngrok.io:20674 (port 2525)"
 echo "   Litestar API: https://especially-loved-goshawk.ngrok-free.app (port 8000)"
 echo ""
-echo "🔧 Note: HTTP domain shared with garasade - run one project at a time"
-echo "📝 Note: Updated for Litestar port 8000 (not Flask port 5001)"
+echo "📝 Note: Make sure Litestar is running on port 8000"
 echo ""
 
 # Kill any existing ngrok processes to avoid conflicts
 pkill ngrok 2>/dev/null
 sleep 1
+
+# Check if Litestar is running on port 8000
+if ! lsof -i:8000 > /dev/null 2>&1; then
+    echo "⚠️  Warning: Nothing is running on port 8000"
+    echo "   Start Litestar with: cd src && uv run litestar --app cellophanemail.app:create_app run --port 8000"
+    echo ""
+fi
 
 # Start both tunnels using the configuration file
 echo "🌐 Starting both tunnels..."

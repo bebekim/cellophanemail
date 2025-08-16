@@ -8,11 +8,11 @@ from datetime import datetime
 from uuid import UUID
 
 from .email_message import EmailMessage
-from .content_processor import ContentProcessor, ProcessingContext, EmailProcessingResult
-from .email_delivery import EmailSenderFactory
+from .content_analyzer import ContentAnalyzer
 from ..models.email_log import EmailLog
 from ..models.organization import Organization
 from ..models.user import User
+from ..services.email_delivery import EmailDeliveryService
 
 logger = logging.getLogger(__name__)
 
@@ -40,18 +40,8 @@ class EmailProcessor:
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize the email processor."""
-        self.content_processor = ContentProcessor()
-        self.config = config or {}
-        
-        # Initialize email sender if configuration is provided
-        self.email_sender = None
-        if self.config:
-            sender_type = self.config.get('EMAIL_DELIVERY_METHOD', 'smtp')
-            try:
-                self.email_sender = EmailSenderFactory.create_sender(sender_type, self.config)
-                logger.info(f"Initialized {sender_type} email sender")
-            except Exception as e:
-                logger.warning(f"Failed to initialize email sender: {e}. Email forwarding will be disabled.")
+        self.analyzer = ContentAnalyzer()
+        self.delivery_service = EmailDeliveryService()
         
     async def process(self, email_message: EmailMessage) -> ProcessingResult:
         """Process an email through the Four Horsemen analysis pipeline."""
@@ -129,9 +119,23 @@ class EmailProcessor:
     
     async def _identify_context(self, email_message: EmailMessage) -> tuple[Optional[UUID], Optional[UUID]]:
         """Identify organization and user from email addresses."""
-        # For now, return None - will be implemented with database lookups
-        # This would look up based on to_addresses domain matching organization
-        return None, None
+        # Return the already identified context from webhook processing
+        org_id = None
+        user_id = None
+        
+        if email_message.organization_id:
+            try:
+                org_id = UUID(email_message.organization_id)
+            except ValueError:
+                logger.warning(f"Invalid organization UUID: {email_message.organization_id}")
+        
+        if email_message.user_id:
+            try:
+                user_id = UUID(email_message.user_id)
+            except ValueError:
+                logger.warning(f"Invalid user UUID: {email_message.user_id}")
+        
+        return org_id, user_id
     
     async def _check_organization_limits(self, org_id: UUID) -> bool:
         """Check if organization can process more emails."""
@@ -196,40 +200,17 @@ class EmailProcessor:
             logger.error(f"Failed to log email: {e}", exc_info=True)
     
     async def _forward_email(self, email_message: EmailMessage):
-        """Forward approved email to recipients."""
-        if not self.email_sender:
-            logger.warning(f"No email sender configured, cannot forward email {email_message.id}")
-            return
-        
-        # Prepare AI result - since email reached here, it passed filtering (SAFE)
-        ai_result = {'ai_classification': 'SAFE'}
-        
-        # Prepare original email data
-        original_email_data = {
-            'original_subject': email_message.subject or 'No Subject',
-            'original_sender': email_message.from_address,
-            'original_body': email_message.text_content or email_message.html_content or 'No content',
-            'message_id': email_message.message_id,
-            'content': email_message.text_content or email_message.html_content or 'No content'
-        }
-        
-        # Send to each recipient
-        successful_sends = 0
-        for to_address in email_message.to_addresses:
-            try:
-                success = await self.email_sender.send_filtered_email(
-                    recipient_shield_address=to_address,
-                    ai_result=ai_result,
-                    original_email_data=original_email_data
-                )
+        """Forward approved email to recipients via Postmark API."""
+        try:
+            logger.info(f"Forwarding email {email_message.id} to {email_message.to_addresses}")
+            
+            # Send via delivery service
+            result = await self.delivery_service.send_email(email_message)
+            
+            if result.success:
+                logger.info(f"✅ Email {email_message.id} forwarded successfully via Postmark: {result.message_id}")
+            else:
+                logger.error(f"❌ Failed to forward email {email_message.id}: {result.error}")
                 
-                if success:
-                    successful_sends += 1
-                    logger.info(f"Successfully forwarded email {email_message.id} to {to_address}")
-                else:
-                    logger.error(f"Failed to forward email {email_message.id} to {to_address}")
-                    
-            except Exception as e:
-                logger.error(f"Error forwarding email {email_message.id} to {to_address}: {e}", exc_info=True)
-        
-        logger.info(f"Forwarded email {email_message.id} to {successful_sends}/{len(email_message.to_addresses)} recipients")
+        except Exception as e:
+            logger.error(f"Exception forwarding email {email_message.id}: {e}", exc_info=True)

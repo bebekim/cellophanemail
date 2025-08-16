@@ -80,6 +80,19 @@ class Settings(BaseSettings):
     postmark_api_token: str = Field(default="", description="Postmark API token")
     postmark_from_email: str = Field(default="", description="Default from email for Postmark")
     
+    # Email delivery settings
+    email_delivery_method: str = Field(default="smtp", description="Email delivery method")
+    smtp_domain: str = Field(default="", description="SMTP domain")
+    
+    # Outbound SMTP settings
+    outbound_smtp_host: str = Field(default="smtp.gmail.com", description="Outbound SMTP host")
+    outbound_smtp_port: int = Field(default=587, description="Outbound SMTP port")
+    outbound_smtp_use_tls: bool = Field(default=True, description="Use TLS for outbound SMTP")
+    
+    # Postmark settings
+    postmark_api_token: str = Field(default="", description="Postmark API token")
+    postmark_from_email: str = Field(default="", description="Postmark from email")
+    
     # Plugin settings
     enabled_plugins: List[str] = Field(
         default=["smtp", "postmark"], 
