@@ -6,7 +6,7 @@ from litestar.security.jwt import JWTAuth
 from litestar.status_codes import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Dict, Any, Optional
-from src.cellophanemail.services.auth_service import (
+from cellophanemail.services.auth_service import (
     validate_email_unique,
     create_user,
     verify_password

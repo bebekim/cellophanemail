@@ -1,6 +1,6 @@
 """CellophoneMail - Litestar Application Factory with Plugin Architecture."""
 
-from litestar import Litestar
+from litestar import Litestar, get
 from litestar.config.cors import CORSConfig
 from litestar.config.compression import CompressionConfig
 from litestar.config.csrf import CSRFConfig
@@ -12,6 +12,29 @@ from litestar.plugins.pydantic import PydanticPlugin
 from cellophanemail.config.settings import get_settings
 from cellophanemail.routes import health, webhooks, auth
 from cellophanemail.plugins.manager import PluginManager
+
+
+@get("/")
+async def root() -> dict:
+    """Root endpoint with API information."""
+    return {
+        "message": "Welcome to CellophoneMail API",
+        "service": "CellophoneMail", 
+        "version": "1.0.0",
+        "description": "AI-powered email protection SaaS with Four Horsemen analysis",
+        "endpoints": {
+            "health": "/health",
+            "documentation": "/docs",
+            "auth": "/auth",
+            "webhooks": "/webhooks"
+        }
+    }
+
+
+@get("/favicon.ico")
+async def favicon() -> dict:
+    """Return empty response for favicon requests."""
+    return {}
 
 
 def create_app() -> Litestar:
@@ -58,6 +81,8 @@ def create_app() -> Litestar:
     # Create Litestar app
     app = Litestar(
         route_handlers=[
+            root,
+            favicon,
             health.router,
             webhooks.router,
             auth.router,
