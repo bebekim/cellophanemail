@@ -2,8 +2,8 @@
 
 import pytest
 import uuid
-from src.cellophanemail.models.shield_address import ShieldAddress
-from src.cellophanemail.models.user import User
+from cellophanemail.models.shield_address import ShieldAddress
+from cellophanemail.models.user import User
 
 
 class TestShieldAddressGeneration:
