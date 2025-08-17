@@ -1,0 +1,76 @@
+#!/bin/bash
+# Development environment startup script for CellophoneMail
+
+export FLASK_ENV=development
+export DATABASE_URL=postgresql://cellophane_user:X1L0ouOWRM7DAVmGxDNWsHm2UDzCWgvW42k5l9OKzGU=@localhost:5433/cellophanemail
+
+echo "🚀 Starting CellophoneMail in DEVELOPMENT mode"
+echo "   Using .env configuration"
+echo "   Database: cellophanemail (PostgreSQL in Docker)"
+echo "   Email: Postmark API"
+echo "   AI: Anthropic Claude"
+echo ""
+
+# Ensure Docker PostgreSQL is running
+echo "🐳 Checking Docker PostgreSQL..."
+if docker ps | grep -q cellophanemail-postgres; then
+    echo "✅ PostgreSQL container is running"
+else
+    echo "🔄 Starting PostgreSQL container..."
+    docker start cellophanemail-postgres
+    sleep 3
+fi
+
+# Run database migrations
+echo "🔄 Running database migrations..."
+PYTHONPATH=src uv run piccolo migrations forwards cellophanemail
+
+if [ $? -eq 0 ]; then
+    echo "✅ Database migrations complete"
+    echo ""
+else
+    echo "⚠️  Migration issues detected, continuing anyway..."
+    echo ""
+fi
+
+# Ensure development user exists
+echo "🔍 Checking development user setup..."
+PYTHONPATH=src uv run python -c "
+import asyncio
+from src.cellophanemail.services.auth_service import validate_email_unique, create_user
+
+async def ensure_dev_user():
+    dev_email = 'dev@cellophanemail.com'
+    is_unique = await validate_email_unique(dev_email)
+    
+    if is_unique:
+        user = await create_user(
+            email=dev_email,
+            password='DevPass123!',
+            first_name='Dev',
+            last_name='User'
+        )
+        print(f'✅ Created development user: {dev_email}')
+        print(f'   Shield address: {user.username}@cellophanemail.com')
+        print(f'   Password: DevPass123!')
+    else:
+        print(f'✅ Development user already exists: {dev_email}')
+
+asyncio.run(ensure_dev_user())
+"
+
+if [ $? -eq 0 ]; then
+    echo ""
+else
+    echo "⚠️  Failed to setup development user, continuing anyway..."
+    echo ""
+fi
+
+# Run Litestar application
+echo "🌟 Starting Litestar application..."
+echo "   Access at: http://localhost:8000"
+echo "   API docs: http://localhost:8000/schema"
+echo ""
+
+# Use uv to run in the correct virtual environment
+PYTHONPATH=src uv run litestar --app cellophanemail.app:app run --host 0.0.0.0 --port 8000 --reload
