@@ -1,12 +1,13 @@
 """Authentication and user management endpoints."""
 
-from litestar import post, get, Response
+from litestar import post, get, Response, Request
 from litestar.controller import Controller
 from litestar.response import Template, Redirect
 from litestar.security.jwt import JWTAuth
 from litestar.status_codes import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_302_FOUND
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Dict, Any, Optional
+from datetime import datetime, timezone
 import secrets
 import urllib.parse
 from cellophanemail.services.auth_service import (
@@ -16,6 +17,7 @@ from cellophanemail.services.auth_service import (
     handle_google_oauth_callback
 )
 from cellophanemail.config.settings import get_settings
+from cellophanemail.middleware.jwt_auth import jwt_auth_required
 
 
 class UserRegistration(BaseModel):
@@ -143,19 +145,19 @@ class AuthController(Controller):
             # Handle OAuth callback using the auth service
             user = await handle_google_oauth_callback(code)
             
-            # TODO: Generate JWT token for the user
-            # TODO: Set session cookie
+            # Create JWT tokens
+            from cellophanemail.middleware.jwt_auth import create_auth_response
+            auth_response = await create_auth_response(user)
+            
+            # Add additional OAuth-specific info
+            auth_response.update({
+                "oauth_provider": user.oauth_provider,
+                "message": "Successfully authenticated with Google",
+                "redirect_url": "/dashboard"
+            })
             
             return Response(
-                content={
-                    "status": "authenticated",
-                    "user_id": str(user.id),
-                    "email": user.email,
-                    "shield_address": f"{user.username}@cellophanemail.com",
-                    "oauth_provider": user.oauth_provider,
-                    "message": "Successfully authenticated with Google",
-                    "redirect_url": "/dashboard"
-                },
+                content=auth_response,
                 status_code=HTTP_201_CREATED
             )
             
@@ -226,45 +228,147 @@ class AuthController(Controller):
     async def login_user(
         self,
         data: UserLogin  
-    ) -> Dict[str, Any]:
+    ) -> Response[Dict[str, Any]]:
         """Authenticate user login."""
+        from cellophanemail.models.user import User
+        from cellophanemail.middleware.jwt_auth import create_auth_response
         
-        # TODO: Validate credentials
-        # TODO: Generate JWT token
-        # TODO: Update last login
+        # Find user by email
+        user = await User.objects().where(
+            User.email == data.email
+        ).first()
         
-        return {
-            "status": "authenticated",
-            "access_token": "temp_token",
-            "token_type": "bearer",
-            "expires_in": 3600
-        }
+        if not user:
+            return Response(
+                content={
+                    "error": "Invalid credentials",
+                    "message": "Email or password is incorrect"
+                },
+                status_code=HTTP_400_BAD_REQUEST
+            )
+        
+        # Verify password
+        is_valid = await verify_password(data.password, user.hashed_password)
+        
+        if not is_valid:
+            return Response(
+                content={
+                    "error": "Invalid credentials",
+                    "message": "Email or password is incorrect"
+                },
+                status_code=HTTP_400_BAD_REQUEST
+            )
+        
+        # Update last login
+        user.last_login = datetime.now(timezone.utc)
+        await user.save()
+        
+        # Create JWT tokens
+        auth_response = await create_auth_response(user)
+        
+        return Response(
+            content=auth_response,
+            status_code=200
+        )
     
-    @get("/profile")
-    async def get_user_profile(self) -> Dict[str, Any]:
+    @get("/profile", guards=[jwt_auth_required])
+    async def get_user_profile(self, request: Request) -> Dict[str, Any]:
         """Get authenticated user profile."""
+        from cellophanemail.models.user import User
         
-        # TODO: Extract user from JWT
-        # TODO: Return user profile data
+        # Get authenticated user from request
+        jwt_user = request.user
+        
+        # Fetch full user data from database
+        user = await User.objects().where(
+            User.id == int(jwt_user.id)
+        ).first()
+        
+        if not user:
+            return Response(
+                content={"error": "User not found"},
+                status_code=404
+            )
         
         return {
-            "user_id": "temp_id", 
-            "email": "user@example.com",
-            "plan": "basic",
-            "cellophane_address": "user123@cellophanemail.com",
+            "user_id": str(user.id),
+            "email": user.email,
+            "username": user.username,
+            "role": user.role or "user",
+            "is_verified": user.is_verified,
+            "shield_address": f"{user.username}@cellophanemail.com",
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "last_login": user.last_login.isoformat() if user.last_login else None,
             "usage": {
-                "emails_processed": 42,
+                "emails_processed": 0,  # TODO: Implement usage tracking
                 "monthly_limit": 1000
             }
         }
     
-    @post("/logout")
-    async def logout_user(self) -> Dict[str, str]:
+    @post("/logout", guards=[jwt_auth_required])
+    async def logout_user(self, request: Request) -> Dict[str, str]:
         """Logout user (invalidate token)."""
+        from cellophanemail.services.jwt_service import blacklist_token, decode_token
         
-        # TODO: Add token to blacklist
+        # Get token from request
+        auth_header = request.headers.get("Authorization", "")
         
-        return {"status": "logged_out"}
+        if auth_header.startswith("Bearer "):
+            token = auth_header.replace("Bearer ", "")
+            
+            # Decode token to get JTI
+            try:
+                payload = decode_token(token)
+                jti = payload.get("jti")
+                
+                if jti:
+                    # Add token to blacklist
+                    blacklist_token(jti)
+            except Exception:
+                pass  # Token already invalid, no need to blacklist
+        
+        return {"status": "logged_out", "message": "Successfully logged out"}
+    
+    @post("/refresh")
+    async def refresh_token(
+        self,
+        data: Dict[str, str]
+    ) -> Response[Dict[str, Any]]:
+        """Refresh access token using refresh token."""
+        from cellophanemail.services.jwt_service import refresh_access_token, JWTError
+        
+        refresh_token = data.get("refresh_token")
+        
+        if not refresh_token:
+            return Response(
+                content={
+                    "error": "Missing refresh token",
+                    "message": "Refresh token is required"
+                },
+                status_code=HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Generate new access token
+            new_access_token = await refresh_access_token(refresh_token)
+            
+            return Response(
+                content={
+                    "access_token": new_access_token,
+                    "token_type": "Bearer",
+                    "expires_in": 900  # 15 minutes
+                },
+                status_code=200
+            )
+            
+        except JWTError as e:
+            return Response(
+                content={
+                    "error": "Invalid refresh token",
+                    "message": str(e)
+                },
+                status_code=HTTP_400_BAD_REQUEST
+            )
 
 
 # Export router for app registration

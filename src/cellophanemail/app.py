@@ -15,6 +15,7 @@ from pathlib import Path
 from cellophanemail.config.settings import get_settings
 from cellophanemail.routes import health, webhooks, auth, frontend
 from cellophanemail.plugins.manager import PluginManager
+from cellophanemail.middleware.jwt_auth import JWTAuthenticationMiddleware
 
 
 @get("/favicon.ico")
@@ -84,6 +85,9 @@ def create_app() -> Litestar:
         compression_config=compression_config,
         openapi_config=openapi_config,
         template_config=template_config,
+        middleware=[
+            JWTAuthenticationMiddleware,  # JWT authentication middleware
+        ],
         dependencies={
             "plugin_manager": Provide(lambda: plugin_manager, sync_to_thread=False),
             "settings": Provide(lambda: settings, sync_to_thread=False),
