@@ -5,8 +5,14 @@ from piccolo.engine.postgres import PostgresEngine
 from piccolo.engine.sqlite import SQLiteEngine
 import os
 
-# Determine database type from DATABASE_URL
-database_url = os.environ.get("DATABASE_URL", "sqlite:///./test.db")
+# Get database URL from settings or environment
+try:
+    from src.cellophanemail.config.settings import get_settings
+    settings = get_settings()
+    database_url = settings.database_url
+except:
+    # Fallback to environment variable
+    database_url = os.environ.get("DATABASE_URL", "postgresql://postgres:password@localhost:5432/cellophanemail")
 
 if database_url.startswith("postgresql"):
     # Parse PostgreSQL connection

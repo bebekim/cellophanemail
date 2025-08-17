@@ -1,20 +1,40 @@
 """Authentication and user management endpoints."""
 
-from litestar import post, get
+from litestar import post, get, Response
 from litestar.controller import Controller
 from litestar.security.jwt import JWTAuth
-from pydantic import BaseModel, EmailStr
-from typing import Dict, Any
+from litestar.status_codes import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Dict, Any, Optional
+from src.cellophanemail.services.auth_service import (
+    validate_email_unique,
+    create_user,
+    verify_password
+)
 
 
 class UserRegistration(BaseModel):
     """User registration payload."""
     
     email: EmailStr
-    password: str
-    full_name: str
-    company: str
-    plan_type: str = "basic"
+    password: str = Field(min_length=8, description="Password must be at least 8 characters")
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    company: Optional[str] = None
+    
+    @field_validator('password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        """Validate password meets minimum requirements."""
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not any(c.islower() for c in v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit")
+        return v
 
 
 class UserLogin(BaseModel):
@@ -29,26 +49,58 @@ class AuthController(Controller):
     
     path = "/auth"
     
-    @post("/register")
+    @post("/register", status_code=HTTP_201_CREATED)
     async def register_user(
         self,
         data: UserRegistration
-    ) -> Dict[str, Any]:
+    ) -> Response[Dict[str, Any]]:
         """Register new user account."""
         
-        # TODO: Validate email uniqueness
-        # TODO: Hash password with bcrypt
-        # TODO: Create user in database
-        # TODO: Send welcome email
-        # TODO: Generate JWT token
+        # Validate email uniqueness
+        is_unique = await validate_email_unique(data.email)
+        if not is_unique:
+            return Response(
+                content={
+                    "error": "Email already registered",
+                    "field": "email"
+                },
+                status_code=HTTP_400_BAD_REQUEST
+            )
         
-        return {
-            "status": "registered",
-            "user_id": "temp_id",
-            "email": data.email,
-            "plan": data.plan_type,
-            "message": "Registration successful"
-        }
+        # Create user with hashed password and shield address
+        try:
+            user = await create_user(
+                email=data.email,
+                password=data.password,
+                first_name=data.first_name,
+                last_name=data.last_name
+            )
+            
+            # TODO: Send welcome/verification email via Postmark
+            # TODO: Generate JWT token for auto-login
+            # TODO: Create Stripe checkout session for trial
+            
+            return Response(
+                content={
+                    "status": "registered",
+                    "user_id": str(user.id),
+                    "email": user.email,
+                    "shield_address": f"{user.username}@cellophanemail.com",
+                    "email_verified": user.is_verified,
+                    "verification_token": user.verification_token,
+                    "message": "Registration successful. Please check your email to verify your account."
+                },
+                status_code=HTTP_201_CREATED
+            )
+            
+        except Exception as e:
+            return Response(
+                content={
+                    "error": "Registration failed",
+                    "message": str(e)
+                },
+                status_code=HTTP_400_BAD_REQUEST
+            )
     
     @post("/login")
     async def login_user(
