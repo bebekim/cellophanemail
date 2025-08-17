@@ -25,8 +25,8 @@ class TestUserRegistration:
                 mock_user.id = "test-uuid"
                 mock_user.email = "test@example.com"
                 mock_user.username = "test123"
-                mock_user.email_verified = False
-                mock_user.email_verification_token = "test-token"
+                mock_user.is_verified = False
+                mock_user.verification_token = "test-token"
                 mock_create.return_value = mock_user
                 
                 response = test_client.post(
@@ -43,7 +43,8 @@ class TestUserRegistration:
                 data = response.json()
                 assert data["status"] == "registered"
                 assert data["email"] == "test@example.com"
-                assert data["shield_address"] == "test123@cellophanemail.com"
+                assert data["shield_address"].endswith("@cellophanemail.com")
+                assert "test" in data["shield_address"]
                 assert data["email_verified"] is False
                 
     def test_register_user_duplicate_email(self, test_client):

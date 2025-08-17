@@ -243,6 +243,6 @@ class TestCreateUser:
             
             # Verify verification token was generated
             call_kwargs = MockUser.call_args.kwargs
-            assert call_kwargs['email_verification_token'] is not None
-            assert isinstance(call_kwargs['email_verification_token'], str)
-            assert len(call_kwargs['email_verification_token']) >= 32
+            assert call_kwargs['verification_token'] is not None
+            assert isinstance(call_kwargs['verification_token'], str)
+            assert len(call_kwargs['verification_token']) >= 32

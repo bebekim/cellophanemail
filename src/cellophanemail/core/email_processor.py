@@ -9,6 +9,7 @@ from uuid import UUID
 
 from .email_message import EmailMessage
 from .content_analyzer import ContentAnalyzer
+from .content_processor import ContentProcessor
 from ..models.email_log import EmailLog
 from ..models.organization import Organization
 from ..models.user import User
@@ -35,12 +36,21 @@ class ProcessingResult:
             self.ai_analysis = {}
 
 
+@dataclass
+class ProcessingContext:
+    """Context for email processing."""
+    organization_id: Optional[str] = None
+    user_id: Optional[str] = None
+    source_plugin: str = "unknown"
+
+
 class EmailProcessor:
     """Main email processing pipeline."""
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize the email processor."""
         self.analyzer = ContentAnalyzer()
+        self.content_processor = ContentProcessor()
         self.delivery_service = EmailDeliveryService()
         
     async def process(self, email_message: EmailMessage) -> ProcessingResult:
