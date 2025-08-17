@@ -2,6 +2,7 @@
 
 from litestar import post, get, Response
 from litestar.controller import Controller
+from litestar.response import Template
 from litestar.security.jwt import JWTAuth
 from litestar.status_codes import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -48,6 +49,28 @@ class AuthController(Controller):
     """Authentication and user management."""
     
     path = "/auth"
+    
+    @get("/register")
+    async def register_form(self) -> Template:
+        """Render the user registration form."""
+        return Template(
+            template_name="auth/register.html",
+            context={
+                "page_title": "Sign Up - CellophoneMail",
+                "meta_description": "Create your CellophoneMail account for AI-powered email protection",
+            }
+        )
+    
+    @get("/login") 
+    async def login_form(self) -> Template:
+        """Render the user login form."""
+        return Template(
+            template_name="auth/login.html",
+            context={
+                "page_title": "Log In - CellophoneMail", 
+                "meta_description": "Sign in to your CellophoneMail account",
+            }
+        )
     
     @post("/register", status_code=HTTP_201_CREATED)
     async def register_user(
