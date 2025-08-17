@@ -3,9 +3,11 @@
 from litestar import Litestar
 from litestar.config.cors import CORSConfig
 from litestar.config.compression import CompressionConfig
+from litestar.config.csrf import CSRFConfig
 from litestar.middleware.rate_limit import RateLimitConfig
 from litestar.openapi.config import OpenAPIConfig
 from litestar.di import Provide
+from litestar.plugins.pydantic import PydanticPlugin
 
 from cellophanemail.config.settings import get_settings
 from cellophanemail.routes import health, webhooks, auth
@@ -25,6 +27,15 @@ def create_app() -> Litestar:
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
         allow_headers=["*"],
         allow_credentials=True,
+    )
+    
+    # CSRF protection for state-changing operations (important for SaaS)
+    csrf_config = CSRFConfig(
+        secret=settings.secret_key,
+        cookie_name="cellophane_csrf",
+        header_name="X-CSRF-Token",
+        exclude=["/webhooks/*", "/health/*"],  # Webhooks need to work without CSRF
+        safe_methods=["GET", "HEAD", "OPTIONS"],
     )
     
     compression_config = CompressionConfig(
@@ -52,6 +63,7 @@ def create_app() -> Litestar:
             auth.router,
         ],
         cors_config=cors_config,
+        csrf_config=csrf_config,
         compression_config=compression_config,
         openapi_config=openapi_config,
         dependencies={
@@ -59,6 +71,8 @@ def create_app() -> Litestar:
             "settings": Provide(lambda: settings, sync_to_thread=False),
         },
         debug=settings.debug,
+        pdb_on_exception=settings.debug,  # Enable Python debugger in debug mode
+        plugins=[PydanticPlugin()],
     )
     
     return app

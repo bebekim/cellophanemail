@@ -104,6 +104,21 @@ class UserService:
             User instance if found, None otherwise
         """
         try:
+            # Extract username from shield address (remove @cellophanemail.com if present)
+            if "@" in shield_address:
+                username = shield_address.split("@")[0]
+            else:
+                username = shield_address
+            
+            # Try to find user by username field
+            user = await User.select().where(
+                User.username == username,
+                User.is_active == True
+            ).first()
+            
+            if user:
+                return user
+            
             # First try direct UUID extraction (faster)
             user_uuid = await ShieldAddress.get_user_id_from_shield(shield_address)
             if user_uuid:
