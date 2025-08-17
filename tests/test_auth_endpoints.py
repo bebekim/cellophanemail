@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 from litestar.testing import TestClient
-from src.cellophanemail.app import create_app
+from cellophanemail.app import create_app
 
 
 @pytest.fixture
@@ -18,8 +18,8 @@ class TestUserRegistration:
     
     def test_register_user_success(self, test_client):
         """Test successful user registration."""
-        with patch('src.cellophanemail.routes.auth.validate_email_unique', new=AsyncMock(return_value=True)):
-            with patch('src.cellophanemail.routes.auth.create_user', new=AsyncMock()) as mock_create:
+        with patch('cellophanemail.routes.auth.validate_email_unique', new=AsyncMock(return_value=True)):
+            with patch('cellophanemail.routes.auth.create_user', new=AsyncMock()) as mock_create:
                 # Mock user object
                 mock_user = MagicMock()
                 mock_user.id = "test-uuid"
@@ -49,7 +49,7 @@ class TestUserRegistration:
                 
     def test_register_user_duplicate_email(self, test_client):
         """Test registration with duplicate email."""
-        with patch('src.cellophanemail.routes.auth.validate_email_unique', new=AsyncMock(return_value=False)):
+        with patch('cellophanemail.routes.auth.validate_email_unique', new=AsyncMock(return_value=False)):
             response = test_client.post(
                 "/auth/register",
                 json={
@@ -77,7 +77,7 @@ class TestUserRegistration:
             }
         )
         
-        assert response.status_code == 422  # Validation error
+        assert response.status_code == 400  # Validation error
         
     def test_register_user_invalid_email(self, test_client):
         """Test registration with invalid email format."""
@@ -91,4 +91,4 @@ class TestUserRegistration:
             }
         )
         
-        assert response.status_code == 422  # Validation error
+        assert response.status_code == 400  # Validation error

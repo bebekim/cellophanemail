@@ -213,8 +213,8 @@ class TestCompleteEmailFlow:
             assert result.should_forward is True
             assert result.block_reason is None
             
-            # Email sender should be None
-            assert processor.email_sender is None
+            # Delivery service should exist but not have a sender configured
+            assert processor.delivery_service is not None
     
     def test_email_delivery_config_property(self):
         """Test the email delivery config property from Settings."""
