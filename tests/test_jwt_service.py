@@ -175,10 +175,16 @@ class TestJWTTokenVerification:
         tampered_token = token[:-1] + ('A' if token[-1] != 'A' else 'B')
         
         # When/Then
-        with pytest.raises(JWTError) as exc:
-            await verify_token(tampered_token, TokenType.ACCESS)
-        
-        assert "invalid" in str(exc.value).lower() or "signature" in str(exc.value).lower()
+        try:
+            result = await verify_token(tampered_token, TokenType.ACCESS)
+            # If we get here, the test should fail because no exception was raised
+            assert False, f"Expected JWTError but got result: {result}"
+        except JWTError as e:
+            # This is expected
+            assert "invalid" in str(e).lower() or "signature" in str(e).lower()
+        except Exception as e:
+            # Unexpected exception type
+            assert False, f"Expected JWTError but got {type(e).__name__}: {e}"
     
     @pytest.mark.asyncio
     async def test_verify_wrong_token_type_raises_error(self):
