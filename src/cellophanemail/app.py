@@ -40,13 +40,16 @@ def create_app() -> Litestar:
     )
     
     # CSRF protection for state-changing operations (important for SaaS)
-    csrf_config = CSRFConfig(
-        secret=settings.secret_key,
-        cookie_name="cellophane_csrf",
-        header_name="X-CSRF-Token",
-        exclude=["/webhooks/*", "/health/*"],  # Webhooks need to work without CSRF
-        safe_methods=["GET", "HEAD", "OPTIONS"],
-    )
+    # Disable CSRF in testing mode
+    csrf_config = None
+    if not settings.testing:
+        csrf_config = CSRFConfig(
+            secret=settings.secret_key,
+            cookie_name="cellophane_csrf",
+            header_name="X-CSRF-Token",
+            exclude=["/webhooks/*", "/health/*"],  # Webhooks need to work without CSRF
+            safe_methods=["GET", "HEAD", "OPTIONS"],
+        )
     
     compression_config = CompressionConfig(
         backend="gzip",
@@ -93,7 +96,7 @@ def create_app() -> Litestar:
             "settings": Provide(lambda: settings, sync_to_thread=False),
         },
         debug=settings.debug,
-        pdb_on_exception=settings.debug,  # Enable Python debugger in debug mode
+        pdb_on_exception=settings.debug if not settings.testing else False,  # Disable pdb during tests
         plugins=[PydanticPlugin()],
     )
     

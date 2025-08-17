@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     
     # App settings
     debug: bool = Field(default=False, description="Debug mode")
+    testing: bool = Field(default=False, description="Testing mode")
     host: str = Field(default="127.0.0.1", description="Host to bind to")
     port: int = Field(default=8000, description="Port to bind to")
     secret_key: str = Field(

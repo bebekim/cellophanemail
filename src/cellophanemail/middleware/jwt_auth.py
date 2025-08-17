@@ -3,7 +3,7 @@
 from typing import Optional, Dict, Any
 from litestar import Request, Response
 from litestar.connection import ASGIConnection
-from litestar.middleware import AbstractAuthenticationMiddleware
+from litestar.middleware import AbstractAuthenticationMiddleware, AuthenticationResult
 from litestar.exceptions import NotAuthorizedException
 from cellophanemail.services.jwt_service import verify_token, TokenType, JWTError, TokenPayload
 from cellophanemail.models.user import User
@@ -41,28 +41,28 @@ class JWTAuthenticationMiddleware(AbstractAuthenticationMiddleware):
     async def authenticate_request(
         self,
         connection: ASGIConnection
-    ) -> Optional[JWTUser]:
+    ) -> AuthenticationResult:
         """Authenticate request using JWT token.
         
         Args:
             connection: ASGI connection
             
         Returns:
-            Authenticated user or None
+            AuthenticationResult with user and auth info
         """
         # Extract token from Authorization header
         auth_header = connection.headers.get("Authorization", "")
+        token = None
         
-        if not auth_header.startswith("Bearer "):
+        if auth_header.startswith("Bearer "):
+            token = auth_header.replace("Bearer ", "")
+        else:
             # Try to get token from cookies as fallback
             token = connection.cookies.get("access_token")
-            if not token:
-                return None
-        else:
-            token = auth_header.replace("Bearer ", "")
         
         if not token:
-            return None
+            # Return empty auth result (no user authenticated)
+            return AuthenticationResult(user=None, auth=None)
         
         try:
             # Verify token
@@ -71,11 +71,12 @@ class JWTAuthenticationMiddleware(AbstractAuthenticationMiddleware):
             # Create user object
             user = await JWTUser.from_token_payload(payload)
             
-            return user
+            # Return authentication result
+            return AuthenticationResult(user=user, auth=token)
             
         except JWTError:
-            # Invalid token, return None (not authenticated)
-            return None
+            # Invalid token, return empty auth result
+            return AuthenticationResult(user=None, auth=None)
 
 
 def jwt_auth_required(connection: ASGIConnection) -> JWTUser:
