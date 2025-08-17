@@ -8,27 +8,13 @@ from litestar.middleware.rate_limit import RateLimitConfig
 from litestar.openapi.config import OpenAPIConfig
 from litestar.di import Provide
 from litestar.plugins.pydantic import PydanticPlugin
+from litestar.contrib.jinja import JinjaTemplateEngine
+from litestar.template.config import TemplateConfig
+from pathlib import Path
 
 from cellophanemail.config.settings import get_settings
-from cellophanemail.routes import health, webhooks, auth
+from cellophanemail.routes import health, webhooks, auth, frontend
 from cellophanemail.plugins.manager import PluginManager
-
-
-@get("/")
-async def root() -> dict:
-    """Root endpoint with API information."""
-    return {
-        "message": "Welcome to CellophoneMail API",
-        "service": "CellophoneMail", 
-        "version": "1.0.0",
-        "description": "AI-powered email protection SaaS with Four Horsemen analysis",
-        "endpoints": {
-            "health": "/health",
-            "documentation": "/docs",
-            "auth": "/auth",
-            "webhooks": "/webhooks"
-        }
-    }
 
 
 @get("/favicon.ico")
@@ -78,11 +64,17 @@ def create_app() -> Litestar:
         path="/docs",
     )
     
+    # Template configuration for Jinja2
+    template_config = TemplateConfig(
+        directory=Path(__file__).parent / "templates",
+        engine=JinjaTemplateEngine,
+    )
+    
     # Create Litestar app
     app = Litestar(
         route_handlers=[
-            root,
             favicon,
+            frontend.router,  # Frontend pages (landing, pricing, etc.)
             health.router,
             webhooks.router,
             auth.router,
@@ -91,6 +83,7 @@ def create_app() -> Litestar:
         csrf_config=csrf_config,
         compression_config=compression_config,
         openapi_config=openapi_config,
+        template_config=template_config,
         dependencies={
             "plugin_manager": Provide(lambda: plugin_manager, sync_to_thread=False),
             "settings": Provide(lambda: settings, sync_to_thread=False),

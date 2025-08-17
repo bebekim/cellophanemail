@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CellophoneMail - AI-Powered Email Protection{% endblock %}</title>
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Hotwire Turbo -->
+    <script type="module">
+        import hotwiredTurbo from 'https://cdn.skypack.dev/@hotwired/turbo';
+    </script>
+    
+    <!-- Hotwire Stimulus -->
+    <script type="module">
+        import { Application, Controller } from 'https://cdn.skypack.dev/@hotwired/stimulus';
+        
+        window.Stimulus = Application.start();
+        
+        // Base controller class
+        window.Controller = Controller;
+    </script>
+    
+    {% block head %}{% endblock %}
+</head>
+<body class="h-full bg-white dark:bg-gray-900">
+    {% block content %}{% endblock %}
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

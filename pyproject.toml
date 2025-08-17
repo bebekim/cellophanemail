@@ -28,6 +28,7 @@ dependencies = [
     "email-validator>=2.2.0",
     "piccolo[postgres]>=1.28.0",
     "litestar[standard]>=2.16.0",
+    "jinja2>=3.1.0",  # Template engine for frontend
     "aiosmtpd>=1.4.6",
     "pyjwt>=2.10.1",
     "cryptography>=45.0.6",
