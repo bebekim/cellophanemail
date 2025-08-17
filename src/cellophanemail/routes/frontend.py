@@ -27,6 +27,28 @@ class FrontendController(Controller):
             }
         )
     
+    @get("/terms")
+    async def terms_page(self) -> Template:
+        """Render the terms of service page."""
+        return Template(
+            template_name="legal/terms.html",
+            context={
+                "page_title": "Terms of Service - CellophoneMail",
+                "meta_description": "CellophoneMail terms of service and user agreement"
+            }
+        )
+    
+    @get("/privacy")
+    async def privacy_page(self) -> Template:
+        """Render the privacy policy page."""
+        return Template(
+            template_name="legal/privacy.html",
+            context={
+                "page_title": "Privacy Policy - CellophoneMail", 
+                "meta_description": "CellophoneMail privacy policy and data protection"
+            }
+        )
+
     @get("/pricing")
     async def pricing_page(self) -> Template:
         """Render the pricing page."""

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="bg-white py-24 sm:py-32 dark:bg-gray-900">
+  <div class="mx-auto max-w-7xl px-6 lg:px-8">
+    <div class="mx-auto max-w-2xl lg:mx-0">
+      <h1 class="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl dark:text-white">Terms of Service</h1>
+      <p class="mt-6 text-lg leading-8 text-gray-600 dark:text-gray-300">
+        Last updated: August 17, 2025
+      </p>
+    </div>
+    
+    <div class="mx-auto mt-16 max-w-4xl">
+      <div class="prose prose-lg prose-gray dark:prose-invert max-w-none">
+        <h2>1. Acceptance of Terms</h2>
+        <p>
+          By creating an account or using CellophoneMail, you agree to be bound by these Terms of Service and our Privacy Policy.
+        </p>
+        
+        <h2>2. Description of Service</h2>
+        <p>
+          CellophoneMail provides AI-powered email protection services using Four Horsemen analysis to detect and filter toxic communications before they reach your inbox.
+        </p>
+        
+        <h2>3. User Accounts</h2>
+        <ul>
+          <li>You must provide accurate and complete information when creating your account</li>
+          <li>You are responsible for maintaining the confidentiality of your account credentials</li>
+          <li>You must notify us immediately of any unauthorized use of your account</li>
+        </ul>
+        
+        <h2>4. Acceptable Use</h2>
+        <p>
+          You may not use CellophoneMail for:
+        </p>
+        <ul>
+          <li>Any unlawful purposes or activities</li>
+          <li>Transmitting spam, malware, or other harmful content</li>
+          <li>Attempting to gain unauthorized access to our systems</li>
+          <li>Interfering with or disrupting our services</li>
+        </ul>
+        
+        <h2>5. Privacy and Data Protection</h2>
+        <p>
+          Your privacy is important to us. Please review our Privacy Policy to understand how we collect, use, and protect your information.
+        </p>
+        
+        <h2>6. Billing and Payments</h2>
+        <ul>
+          <li>Subscription fees are billed in advance on a monthly basis</li>
+          <li>All fees are non-refundable except as required by law</li>
+          <li>We reserve the right to change our pricing with 30 days' notice</li>
+        </ul>
+        
+        <h2>7. Termination</h2>
+        <p>
+          We may terminate or suspend your account immediately if you violate these terms. You may cancel your subscription at any time through your account settings.
+        </p>
+        
+        <h2>8. Limitation of Liability</h2>
+        <p>
+          CellophoneMail is provided "as is" without warranties of any kind. We shall not be liable for any indirect, incidental, or consequential damages.
+        </p>
+        
+        <h2>9. Contact Information</h2>
+        <p>
+          If you have questions about these Terms of Service, please contact us at:
+          <a href="mailto:legal@cellophanemail.com" class="text-indigo-600 dark:text-indigo-400">legal@cellophanemail.com</a>
+        </p>
+      </div>
+      
+      <div class="mt-16 text-center">
+        <a href="/auth/register" class="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+          Back to Sign Up
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

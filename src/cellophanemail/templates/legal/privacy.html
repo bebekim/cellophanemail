@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="bg-white py-24 sm:py-32 dark:bg-gray-900">
+  <div class="mx-auto max-w-7xl px-6 lg:px-8">
+    <div class="mx-auto max-w-2xl lg:mx-0">
+      <h1 class="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl dark:text-white">Privacy Policy</h1>
+      <p class="mt-6 text-lg leading-8 text-gray-600 dark:text-gray-300">
+        Last updated: August 17, 2025
+      </p>
+    </div>
+    
+    <div class="mx-auto mt-16 max-w-4xl">
+      <div class="prose prose-lg prose-gray dark:prose-invert max-w-none">
+        <h2>1. Information We Collect</h2>
+        <p>
+          We collect information you provide directly to us, such as:
+        </p>
+        <ul>
+          <li>Account information (email address, name, organization details)</li>
+          <li>Email content for analysis and filtering</li>
+          <li>Usage data and service interactions</li>
+          <li>Payment and billing information</li>
+        </ul>
+        
+        <h2>2. How We Use Your Information</h2>
+        <p>
+          We use your information to:
+        </p>
+        <ul>
+          <li>Provide and improve our AI-powered email protection services</li>
+          <li>Analyze emails for Four Horsemen toxicity patterns</li>
+          <li>Process payments and manage your subscription</li>
+          <li>Communicate with you about your account and our services</li>
+          <li>Ensure the security and integrity of our platform</li>
+        </ul>
+        
+        <h2>3. AI Analysis and Email Processing</h2>
+        <p>
+          Our Four Horsemen AI system analyzes email content to detect toxic communication patterns including criticism, contempt, defensiveness, and stonewalling. This analysis is performed automatically and securely to protect your mental health and productivity.
+        </p>
+        
+        <h2>4. Data Sharing and Disclosure</h2>
+        <p>
+          We do not sell, trade, or otherwise transfer your personal information to third parties except:
+        </p>
+        <ul>
+          <li>With your explicit consent</li>
+          <li>To trusted service providers who assist in operating our services</li>
+          <li>When required by law or to protect our rights</li>
+          <li>In connection with a business transfer or acquisition</li>
+        </ul>
+        
+        <h2>5. Data Security</h2>
+        <p>
+          We implement appropriate security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. This includes encryption, secure servers, and regular security audits.
+        </p>
+        
+        <h2>6. Data Retention</h2>
+        <p>
+          We retain your personal information only as long as necessary to provide our services and fulfill legal obligations. Email content is processed in real-time and not permanently stored unless required for service delivery.
+        </p>
+        
+        <h2>7. Your Rights</h2>
+        <p>
+          You have the right to:
+        </p>
+        <ul>
+          <li>Access and update your personal information</li>
+          <li>Request deletion of your data</li>
+          <li>Opt-out of certain communications</li>
+          <li>Export your data in a portable format</li>
+        </ul>
+        
+        <h2>8. International Data Transfers</h2>
+        <p>
+          Your information may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place to protect your privacy rights.
+        </p>
+        
+        <h2>9. Changes to This Policy</h2>
+        <p>
+          We may update this Privacy Policy from time to time. We will notify you of any significant changes via email or through our service.
+        </p>
+        
+        <h2>10. Contact Us</h2>
+        <p>
+          If you have questions about this Privacy Policy, please contact us at:
+          <a href="mailto:privacy@cellophanemail.com" class="text-indigo-600 dark:text-indigo-400">privacy@cellophanemail.com</a>
+        </p>
+      </div>
+      
+      <div class="mt-16 text-center">
+        <a href="/auth/register" class="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+          Back to Sign Up
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

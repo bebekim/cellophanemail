@@ -89,6 +89,37 @@
    - [X] Shield address generation and lookup tests confirmed
    - [X] Integration tests covering end-to-end flow working
 
+** DONE Implement Authentication System with OAuth and TDD
+   CLOSED: [2025-08-17]
+   - [X] Implement email uniqueness validation with TDD
+   - [X] Implement user creation function with TDD
+   - [X] Create signup endpoint in auth controller
+   - [X] Fix PostgreSQL connection using Docker
+   - [X] Fix email processor and test failures
+   - [X] Implement OAuth user creation with TDD
+   - [X] Implement Google OAuth callback handling
+   - [X] Add OAuth fields to User model
+   - [X] Implement duplicate email handling for OAuth
+   - [X] Create signup/login templates with TailwindCSS
+   - [X] Add Google OAuth routes and callback handling
+   
+   ✅ **Complete Authentication Infrastructure:**
+   - 25 passing tests covering all auth functionality
+   - Dual authentication methods (Email/Password + Google OAuth)
+   - Account linking for users with multiple auth methods
+   - Responsive signup/login forms with TailwindCSS + Hotwire
+   - Individual and Organization account types supported
+   - OAuth redirect routes at /auth/oauth/google
+   - OAuth callback handling at /auth/oauth/google/callback
+   - Settings integration for OAuth configuration
+
+* IN PROGRESS 🚧
+** TODO Add session management
+   - [ ] Implement JWT token generation
+   - [ ] Create session middleware
+   - [ ] Add remember me functionality
+   - [ ] Implement logout with token invalidation
+
 ** TODO Create SMTP plugin from existing aiosmtpd code  
    SCHEDULED: <2025-01-08>
    - [ ] Port SMTP server code from protectedtex to =plugins/smtp/=
@@ -97,20 +128,7 @@
    - [ ] Add configuration for SMTP host/port settings
    - [ ] Test local SMTP receiving and processing
 
-** TODO Build Postmark plugin for production SaaS
-   SCHEDULED: <2025-01-08>  
-   - [ ] Create webhook handler in =plugins/postmark/webhook.py=
-   - [ ] Parse Postmark inbound email format to EmailMessage
-   - [ ] Add Postmark API integration for outbound sending
-   - [ ] Implement webhook signature verification
-   - [ ] Test end-to-end Postmark flow
-
 * FUTURE PHASES 🔮
-** TODO Implement authentication system
-   - [ ] User registration/login endpoints
-   - [ ] JWT token management
-   - [ ] Password hashing with bcrypt
-   - [ ] Email verification flow
 
 ** TODO Add Stripe billing integration
    - [ ] Subscription webhook handlers

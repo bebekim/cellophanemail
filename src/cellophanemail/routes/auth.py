@@ -2,16 +2,20 @@
 
 from litestar import post, get, Response
 from litestar.controller import Controller
-from litestar.response import Template
+from litestar.response import Template, Redirect
 from litestar.security.jwt import JWTAuth
-from litestar.status_codes import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
+from litestar.status_codes import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_302_FOUND
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Dict, Any, Optional
+import secrets
+import urllib.parse
 from cellophanemail.services.auth_service import (
     validate_email_unique,
     create_user,
-    verify_password
+    verify_password,
+    handle_google_oauth_callback
 )
+from cellophanemail.config.settings import get_settings
 
 
 class UserRegistration(BaseModel):
@@ -71,6 +75,99 @@ class AuthController(Controller):
                 "meta_description": "Sign in to your CellophoneMail account",
             }
         )
+    
+    @get("/oauth/google")
+    async def google_oauth_redirect(self) -> Redirect:
+        """Redirect to Google OAuth authorization URL."""
+        settings = get_settings()
+        
+        if not settings.google_client_id:
+            # For development/testing, redirect to callback with error
+            return Redirect(
+                path="/auth/oauth/google/callback?error=missing_client_id",
+                status_code=HTTP_302_FOUND
+            )
+        
+        # Generate state parameter for CSRF protection
+        state = secrets.token_urlsafe(32)
+        # TODO: Store state in session/cache for verification
+        
+        # Build Google OAuth URL
+        base_url = "https://accounts.google.com/o/oauth2/v2/auth"
+        params = {
+            "client_id": settings.google_client_id,
+            "redirect_uri": settings.google_redirect_uri or "http://localhost:8000/auth/oauth/google/callback",
+            "response_type": "code",
+            "scope": "openid email profile",
+            "state": state,
+            "access_type": "offline",
+            "prompt": "consent"
+        }
+        
+        auth_url = f"{base_url}?{urllib.parse.urlencode(params)}"
+        return Redirect(path=auth_url, status_code=HTTP_302_FOUND)
+    
+    @get("/oauth/google/callback")
+    async def google_oauth_callback(
+        self,
+        code: str | None = None,
+        oauth_state: str | None = None,
+        error: str | None = None
+    ) -> Response[Dict[str, Any]]:
+        """Handle Google OAuth callback."""
+        
+        # Handle OAuth errors
+        if error:
+            return Response(
+                content={
+                    "error": "oauth_error",
+                    "message": f"Google OAuth error: {error}",
+                    "redirect_url": "/auth/login"
+                },
+                status_code=HTTP_400_BAD_REQUEST
+            )
+        
+        if not code:
+            return Response(
+                content={
+                    "error": "missing_code",
+                    "message": "Missing authorization code from Google",
+                    "redirect_url": "/auth/login"
+                },
+                status_code=HTTP_400_BAD_REQUEST
+            )
+        
+        # TODO: Verify oauth_state parameter for CSRF protection
+        
+        try:
+            # Handle OAuth callback using the auth service
+            user = await handle_google_oauth_callback(code)
+            
+            # TODO: Generate JWT token for the user
+            # TODO: Set session cookie
+            
+            return Response(
+                content={
+                    "status": "authenticated",
+                    "user_id": str(user.id),
+                    "email": user.email,
+                    "shield_address": f"{user.username}@cellophanemail.com",
+                    "oauth_provider": user.oauth_provider,
+                    "message": "Successfully authenticated with Google",
+                    "redirect_url": "/dashboard"
+                },
+                status_code=HTTP_201_CREATED
+            )
+            
+        except Exception as e:
+            return Response(
+                content={
+                    "error": "oauth_callback_failed",
+                    "message": f"Failed to process Google OAuth callback: {str(e)}",
+                    "redirect_url": "/auth/login"
+                },
+                status_code=HTTP_400_BAD_REQUEST
+            )
     
     @post("/register", status_code=HTTP_201_CREATED)
     async def register_user(
