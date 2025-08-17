@@ -7,7 +7,7 @@ import os
 
 # Get database URL from settings or environment
 try:
-    from src.cellophanemail.config.settings import get_settings
+    from cellophanemail.config.settings import get_settings
     settings = get_settings()
     database_url = settings.database_url
 except:

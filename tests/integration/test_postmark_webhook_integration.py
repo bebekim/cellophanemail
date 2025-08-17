@@ -4,8 +4,8 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from uuid import uuid4
 
-from src.cellophanemail.routes.webhooks import WebhookController, PostmarkWebhookPayload
-from src.cellophanemail.core.email_message import EmailMessage
+from cellophanemail.routes.webhooks import WebhookController, PostmarkWebhookPayload
+from cellophanemail.core.email_message import EmailMessage
 
 
 class TestPostmarkWebhookIntegration:

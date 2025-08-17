@@ -37,7 +37,7 @@ fi
 echo "🔍 Checking development user setup..."
 PYTHONPATH=src uv run python -c "
 import asyncio
-from src.cellophanemail.services.auth_service import validate_email_unique, create_user
+from cellophanemail.services.auth_service import validate_email_unique, create_user
 
 async def ensure_dev_user():
     dev_email = 'dev@cellophanemail.com'

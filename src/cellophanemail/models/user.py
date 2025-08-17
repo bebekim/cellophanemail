@@ -27,7 +27,9 @@ class User(Table, tablename="users"):
     username = Varchar(length=100, unique=True, index=True, null=True)
     
     # Authentication
-    hashed_password = Varchar(length=255, null=False)
+    hashed_password = Varchar(length=255, null=True)  # Null for OAuth-only users
+    oauth_provider = Varchar(length=50, null=True)  # e.g., 'google', 'github', etc.
+    oauth_id = Varchar(length=255, null=True)  # Provider-specific user ID
     is_active = Boolean(default=True)
     is_verified = Boolean(default=False)
     verification_token = Varchar(length=255, null=True)
