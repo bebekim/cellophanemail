@@ -97,6 +97,59 @@ class AuthController(Controller):
             }
         )
     
+    @get("/dashboard", guards=[jwt_auth_required])
+    async def dashboard(self, request: Request) -> Template:
+        """Render the user dashboard."""
+        from cellophanemail.models.user import User
+        
+        # Get authenticated user from request
+        jwt_user = request.user
+        
+        # Fetch full user data from database
+        user = await User.objects().where(
+            User.id == jwt_user.id
+        ).first()
+        
+        if not user:
+            return Template(
+                template_name="errors/404.html",
+                context={"page_title": "User Not Found"}
+            )
+        
+        # TODO: Fetch protected email addresses from database
+        # For now, using mock data
+        protected_emails = [
+            {
+                "id": 1,
+                "designation": "Work Alerts",
+                "email_address": "alerts@company.com",
+                "emails_received": 45,
+                "emails_filtered": 12,
+                "created_at": "2025-01-15"
+            },
+            {
+                "id": 2,
+                "designation": "Service Notifications", 
+                "email_address": "notifications@service.com",
+                "emails_received": 23,
+                "emails_filtered": 8,
+                "created_at": "2025-01-10"
+            }
+        ]
+        
+        return Template(
+            template_name="dashboard.html",
+            context={
+                "page_title": "Dashboard - CellophoneMail",
+                "meta_description": "Manage your email protection settings",
+                "user": user,
+                "shield_address": f"{user.username}@cellophanemail.com",
+                "protected_emails": protected_emails,
+                "total_protections": len(protected_emails),
+                "request": request,
+            }
+        )
+    
     @post("/register", status_code=HTTP_201_CREATED)
     async def register_user(
         self,
@@ -155,9 +208,9 @@ class AuthController(Controller):
         self,
         data: UserLogin  
     ) -> Response[Dict[str, Any]]:
-        """Authenticate user login."""
+        """Authenticate user login with hybrid cookie + token strategy."""
         from cellophanemail.models.user import User
-        from cellophanemail.middleware.jwt_auth import create_auth_response
+        from cellophanemail.middleware.jwt_auth import create_dual_auth_response
         
         # Find user by email
         user = await User.objects().where(
@@ -174,7 +227,7 @@ class AuthController(Controller):
             )
         
         # Verify password
-        is_valid = await verify_password(data.password, user.hashed_password)
+        is_valid = verify_password(data.password, user.hashed_password)
         
         if not is_valid:
             return Response(
@@ -185,17 +238,15 @@ class AuthController(Controller):
                 status_code=HTTP_400_BAD_REQUEST
             )
         
-        # Update last login
-        user.last_login = datetime.now(timezone.utc)
-        await user.save()
+        # TODO: Update last login (fix timezone issue first)
+        # user.last_login = datetime.now(timezone.utc)
+        # await user.save()
         
-        # Create JWT tokens
-        auth_response = await create_auth_response(user)
+        # Create response with both cookies and tokens
+        response = Response(content={}, status_code=200)
+        response = await create_dual_auth_response(user, response)
         
-        return Response(
-            content=auth_response,
-            status_code=200
-        )
+        return response
     
     @get("/profile", guards=[jwt_auth_required])
     async def get_user_profile(self, request: Request) -> Dict[str, Any]:
@@ -207,7 +258,7 @@ class AuthController(Controller):
         
         # Fetch full user data from database
         user = await User.objects().where(
-            User.id == int(jwt_user.id)
+            User.id == jwt_user.id
         ).first()
         
         if not user:
@@ -220,7 +271,7 @@ class AuthController(Controller):
             "user_id": str(user.id),
             "email": user.email,
             "username": user.username,
-            "role": user.role or "user",
+            "role": "user",  # Default role since User model doesn't have role field
             "is_verified": user.is_verified,
             "shield_address": f"{user.username}@cellophanemail.com",
             "created_at": user.created_at.isoformat() if user.created_at else None,
@@ -232,28 +283,51 @@ class AuthController(Controller):
         }
     
     @post("/logout", guards=[jwt_auth_required])
-    async def logout_user(self, request: Request) -> Dict[str, str]:
-        """Logout user (invalidate token)."""
+    async def logout_user(self, request: Request) -> Response[Dict[str, str]]:
+        """Logout user (invalidate tokens and clear cookies)."""
         from cellophanemail.services.jwt_service import blacklist_token, decode_token
         
-        # Get token from request
-        auth_header = request.headers.get("Authorization", "")
+        # Get tokens from both sources for blacklisting
+        tokens_to_blacklist = []
         
+        # Check Authorization header
+        auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
-            token = auth_header.replace("Bearer ", "")
-            
-            # Decode token to get JTI
+            tokens_to_blacklist.append(auth_header.replace("Bearer ", ""))
+        
+        # Check cookies
+        cookie_access_token = request.cookies.get("access_token")
+        if cookie_access_token:
+            tokens_to_blacklist.append(cookie_access_token)
+        
+        cookie_refresh_token = request.cookies.get("refresh_token")
+        if cookie_refresh_token:
+            tokens_to_blacklist.append(cookie_refresh_token)
+        
+        # Blacklist all found tokens
+        for token in tokens_to_blacklist:
             try:
                 payload = decode_token(token)
                 jti = payload.get("jti")
-                
                 if jti:
-                    # Add token to blacklist
                     blacklist_token(jti)
             except Exception:
                 pass  # Token already invalid, no need to blacklist
         
-        return {"status": "logged_out", "message": "Successfully logged out"}
+        # Create response and clear cookies
+        response = Response(
+            content={
+                "status": "logged_out", 
+                "message": "Successfully logged out. Please clear localStorage manually."
+            },
+            status_code=200
+        )
+        
+        # Clear authentication cookies
+        response.delete_cookie("access_token")
+        response.delete_cookie("refresh_token")
+        
+        return response
     
     @post("/refresh")
     async def refresh_token(
