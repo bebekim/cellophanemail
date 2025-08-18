@@ -40,7 +40,7 @@ def create_app() -> Litestar:
     )
     
     # CSRF protection for state-changing operations (important for SaaS)
-    # Disable CSRF in testing mode
+    # Disable CSRF in testing mode only
     csrf_config = None
     if not settings.testing:
         csrf_config = CSRFConfig(

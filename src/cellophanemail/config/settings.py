@@ -93,10 +93,6 @@ class Settings(BaseSettings):
     stripe_api_key: str = Field(default="", description="Stripe API key")
     stripe_webhook_secret: str = Field(default="", description="Stripe webhook secret")
     
-    # OAuth settings
-    google_client_id: str = Field(default="", description="Google OAuth client ID")
-    google_client_secret: str = Field(default="", description="Google OAuth client secret")
-    google_redirect_uri: str = Field(default="", description="Google OAuth redirect URI")
     
     @property
     def piccolo_config(self):
