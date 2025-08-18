@@ -231,7 +231,7 @@ async def refresh_access_token(refresh_token: str) -> str:
         return create_access_token(
             user_id=str(user.id),
             email=user.email,
-            role=user.role or "user"
+            role="user"  # Default role since User model doesn't have role field
         )
     except Exception as e:
         # For testing, create token without database lookup

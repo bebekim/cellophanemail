@@ -42,7 +42,11 @@ class JWTAuthenticationMiddleware(AbstractAuthenticationMiddleware):
         self,
         connection: ASGIConnection
     ) -> AuthenticationResult:
-        """Authenticate request using JWT token.
+        """Authenticate request using JWT token with multiple source priority.
+        
+        Token extraction priority:
+        1. Authorization header (for API calls)
+        2. httpOnly access_token cookie (for browser navigation)
         
         Args:
             connection: ASGI connection
@@ -50,15 +54,7 @@ class JWTAuthenticationMiddleware(AbstractAuthenticationMiddleware):
         Returns:
             AuthenticationResult with user and auth info
         """
-        # Extract token from Authorization header
-        auth_header = connection.headers.get("Authorization", "")
-        token = None
-        
-        if auth_header.startswith("Bearer "):
-            token = auth_header.replace("Bearer ", "")
-        else:
-            # Try to get token from cookies as fallback
-            token = connection.cookies.get("access_token")
+        token = self._extract_token_with_priority(connection)
         
         if not token:
             # Return empty auth result (no user authenticated)
@@ -77,16 +73,40 @@ class JWTAuthenticationMiddleware(AbstractAuthenticationMiddleware):
         except JWTError:
             # Invalid token, return empty auth result
             return AuthenticationResult(user=None, auth=None)
+    
+    def _extract_token_with_priority(self, connection: ASGIConnection) -> Optional[str]:
+        """Extract JWT token from multiple sources with priority order.
+        
+        Priority:
+        1. Authorization header (API calls)
+        2. httpOnly cookie (browser navigation)
+        
+        Args:
+            connection: ASGI connection
+            
+        Returns:
+            JWT token string or None
+        """
+        # Priority 1: Authorization header
+        auth_header = connection.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            return auth_header.replace("Bearer ", "")
+        
+        # Priority 2: httpOnly cookie
+        cookie_token = connection.cookies.get("access_token")
+        if cookie_token:
+            return cookie_token
+        
+        # No token found
+        return None
 
 
-def jwt_auth_required(connection: ASGIConnection) -> JWTUser:
+def jwt_auth_required(connection: ASGIConnection, route_handler) -> None:
     """Guard function to require JWT authentication.
     
     Args:
         connection: ASGI connection
-        
-    Returns:
-        Authenticated user
+        route_handler: The route handler being protected
         
     Raises:
         NotAuthorizedException: If user is not authenticated
@@ -95,8 +115,6 @@ def jwt_auth_required(connection: ASGIConnection) -> JWTUser:
     
     if not user or not isinstance(user, JWTUser):
         raise NotAuthorizedException("Authentication required")
-    
-    return user
 
 
 def jwt_auth_optional(connection: ASGIConnection) -> Optional[JWTUser]:
@@ -135,7 +153,7 @@ async def create_auth_response(
     access_token = create_access_token(
         user_id=str(user.id),
         email=user.email,
-        role=user.role or "user"
+        role="user"  # Default role since User model doesn't have role field
     )
     
     response_data = {
@@ -146,7 +164,7 @@ async def create_auth_response(
             "id": str(user.id),
             "email": user.email,
             "username": user.username,
-            "role": user.role or "user",
+            "role": "user",  # Default role since User model doesn't have role field
             "is_verified": user.is_verified
         }
     }
@@ -156,3 +174,73 @@ async def create_auth_response(
         response_data["refresh_token"] = refresh_token
     
     return response_data
+
+
+async def create_dual_auth_response(
+    user: User,
+    response: Response,
+    include_refresh: bool = True
+) -> Response:
+    """Create authentication response with both cookies and tokens for hybrid auth.
+    
+    Args:
+        user: User model instance
+        response: Response object to set cookies on
+        include_refresh: Whether to include refresh token
+        
+    Returns:
+        Response with secure cookies set and JSON token data
+    """
+    from cellophanemail.services.jwt_service import create_access_token, create_refresh_token
+    from cellophanemail.config.settings import get_settings
+    
+    settings = get_settings()
+    
+    # Create tokens
+    access_token = create_access_token(
+        user_id=str(user.id),
+        email=user.email,
+        role="user"
+    )
+    
+    # Set secure httpOnly cookie for browser navigation
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        max_age=900,  # 15 minutes (same as token expiry)
+        httponly=True,  # Prevent XSS
+        secure=not settings.debug,  # HTTPS only in production
+        samesite="lax"  # CSRF protection while allowing normal navigation
+    )
+    
+    # Prepare response data for localStorage (API calls)
+    response_data = {
+        "access_token": access_token,
+        "token_type": "Bearer", 
+        "expires_in": 900,
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "username": user.username,
+            "role": "user",
+            "is_verified": user.is_verified
+        }
+    }
+    
+    if include_refresh:
+        refresh_token = create_refresh_token(user_id=str(user.id))
+        response_data["refresh_token"] = refresh_token
+        
+        # Also set refresh token cookie with longer expiry
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            max_age=7 * 24 * 60 * 60,  # 7 days
+            httponly=True,
+            secure=not settings.debug,
+            samesite="lax"
+        )
+    
+    # Set the response content
+    response.content = response_data
+    return response
