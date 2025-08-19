@@ -17,6 +17,7 @@ from .routes import health, webhooks, auth, frontend
 from .plugins.manager import PluginManager
 from .middleware.jwt_auth import JWTAuthenticationMiddleware
 from .providers.postmark.webhook import PostmarkWebhookHandler
+from .providers.gmail.webhook import GmailWebhookHandler
 
 
 @get("/favicon.ico")
@@ -84,6 +85,7 @@ def create_app() -> Litestar:
             webhooks.router,  # Legacy webhooks (will migrate later)
             auth.router,
             PostmarkWebhookHandler,  # New provider-based webhook
+            GmailWebhookHandler,  # Gmail provider webhook
         ],
         cors_config=cors_config,
         csrf_config=csrf_config,
