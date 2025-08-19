@@ -100,14 +100,18 @@ class EmailProtectionProcessor:
             parts.append(f"Subject: {email.subject}")
         
         # Include text body
-        if email.text_content:
-            parts.append(email.text_content)
+        # Support both naming conventions during migration
+        text_body = getattr(email, 'text_body', None) or getattr(email, 'text_content', None)
+        html_body = getattr(email, 'html_body', None) or getattr(email, 'html_content', None)
+        
+        if text_body:
+            parts.append(text_body)
         
         # If no text body, try to extract from HTML (simplified)
-        elif email.html_content:
+        elif html_body:
             # In production, use proper HTML parsing
             import re
-            text = re.sub('<[^<]+?>', '', email.html_content)
+            text = re.sub('<[^<]+?>', '', html_body)
             parts.append(text)
         
         return "\n".join(parts)

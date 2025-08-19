@@ -3,6 +3,7 @@
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+from email.utils import parsedate_to_datetime
 import os
 
 try:
@@ -57,6 +58,14 @@ class PostmarkProvider(EmailProvider):
                     if addr and isinstance(addr, dict)
                 ]
             
+            # Parse date - Postmark uses RFC 2822 format
+            received_at = datetime.now()
+            if 'Date' in raw_data and raw_data['Date']:
+                try:
+                    received_at = parsedate_to_datetime(raw_data['Date'])
+                except Exception as e:
+                    logger.warning(f"Failed to parse date '{raw_data['Date']}': {e}, using current time")
+            
             # Create EmailMessage from Postmark data
             message = EmailMessage(
                 message_id=raw_data.get('MessageID', ''),
@@ -67,7 +76,7 @@ class PostmarkProvider(EmailProvider):
                 html_body=raw_data.get('HtmlBody'),
                 headers={h['Name']: h['Value'] for h in raw_data.get('Headers', []) if h and isinstance(h, dict)},
                 attachments=raw_data.get('Attachments', []),
-                received_at=datetime.fromisoformat(raw_data['Date']) if 'Date' in raw_data else datetime.now(),
+                received_at=received_at,
                 shield_address=to_address if to_address.endswith('@cellophanemail.com') else None
             )
             
