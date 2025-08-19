@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from .provider import PostmarkProvider
 from ..contracts import EmailMessage
 from ...features.email_protection import EmailProtectionProcessor
+from ...features.shield_addresses import ShieldAddressManager
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +43,10 @@ class PostmarkWebhookHandler(Controller):
         try:
             logger.info(f"Received Postmark webhook for message {data.MessageID}")
             
-            # Initialize provider and protection for this request
+            # Initialize provider, protection, and shield address manager for this request
             provider = PostmarkProvider()
             protection = EmailProtectionProcessor()
+            shield_manager = ShieldAddressManager()
             
             # Convert to common EmailMessage format
             email_message = await provider.receive_message(data.model_dump())
@@ -56,11 +58,18 @@ class PostmarkWebhookHandler(Controller):
                     status_code=HTTP_400_BAD_REQUEST
                 )
             
-            # TODO: In production, look up user by shield address
-            # For now, use demo values
-            user_email = "demo@example.com"
-            user_id = "demo-user-001"
-            organization_id = None
+            # Look up user by shield address
+            shield_info = await shield_manager.lookup_user_by_shield_address(email_message.shield_address)
+            if not shield_info:
+                logger.warning(f"No active user found for shield address: {email_message.shield_address}")
+                return Response(
+                    content={"error": "Shield address not found or inactive"},
+                    status_code=HTTP_404_NOT_FOUND
+                )
+            
+            user_email = shield_info.user_email
+            user_id = shield_info.user_id
+            organization_id = shield_info.organization_id
             
             # Process through email protection
             protection_result = await protection.process_email(
