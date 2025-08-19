@@ -8,7 +8,8 @@ from aiosmtpd.controller import Controller
 from aiosmtpd.smtp import SMTP as SMTPServer, Envelope, Session
 
 from ...core.email_message import EmailMessage
-from ...core.email_processor import EmailProcessor
+from ...features.email_protection import EmailProtectionProcessor
+from ...features.shield_addresses import ShieldAddressManager
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +17,10 @@ logger = logging.getLogger(__name__)
 class SMTPHandler:
     """Handler for SMTP server events."""
     
-    def __init__(self, processor: Optional[EmailProcessor] = None):
-        """Initialize SMTP handler with email processor."""
-        self.processor = processor or EmailProcessor()
+    def __init__(self):
+        """Initialize SMTP handler with new architecture components."""
+        self.protection = EmailProtectionProcessor()
+        self.shield_manager = ShieldAddressManager()
         
     async def handle_RCPT(self, server: SMTPServer, session: Session, envelope: Envelope, address: str, rcpt_options: list):
         """Handle RCPT TO command."""
@@ -38,14 +40,27 @@ class SMTPHandler:
                 source="smtp"
             )
             
-            # Process the email through the pipeline
-            result = await self.processor.process(email_message)
+            # Look up user by shield address 
+            shield_info = await self.shield_manager.lookup_user_by_shield_address(
+                email_message.to_addresses[0] if email_message.to_addresses else ""
+            )
+            
+            if not shield_info:
+                logger.warning(f"Shield address not found: {email_message.to_addresses}")
+                return '550 Recipient not found'
+            
+            # Process through email protection
+            result = await self.protection.process_email(
+                email_message,
+                user_email=shield_info.user_email,
+                organization_id=shield_info.organization_id
+            )
             
             if result.should_forward:
-                logger.info(f"Email {email_message.id} forwarded successfully")
+                logger.info(f"Email {email_message.message_id} forwarded successfully")
                 return '250 Message accepted for delivery'
             else:
-                logger.warning(f"Email {email_message.id} blocked: {result.block_reason}")
+                logger.warning(f"Email {email_message.message_id} blocked: {result.block_reason}")
                 # Still return 250 to avoid bounces
                 return '250 Message accepted but filtered'
                 
@@ -67,15 +82,8 @@ class SMTPServerRunner:
         """Start the SMTP server."""
         logger.info(f"Starting SMTP server on {self.host}:{self.port}")
         
-        # Create email processor with delivery configuration
-        from cellophanemail.config.settings import get_settings
-        settings = get_settings()
-        email_config = settings.email_delivery_config
-        
-        processor = EmailProcessor(config=email_config)
-        
-        # Create handler and controller
-        handler = SMTPHandler(processor=processor)
+        # Create handler with new architecture
+        handler = SMTPHandler()
         self.controller = Controller(
             handler,
             hostname=self.host,

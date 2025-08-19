@@ -1,1 +1,0 @@
-"""Adapters for integrating vertical slices with existing infrastructure."""

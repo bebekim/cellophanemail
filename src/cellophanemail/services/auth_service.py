@@ -4,7 +4,7 @@ import bcrypt
 import random
 import re
 import uuid
-from cellophanemail.models.user import User
+from ..models.user import User
 
 
 def hash_password(password: str) -> str:

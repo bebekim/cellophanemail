@@ -1,1 +1,0 @@
-# Vertical Slices for CellophoneMail

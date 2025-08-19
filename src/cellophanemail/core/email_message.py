@@ -36,6 +36,9 @@ class EmailMessage:
     organization_id: Optional[UUID] = None
     user_id: Optional[UUID] = None
     
+    # Shield address (for provider/feature architecture compatibility)
+    shield_address: Optional[str] = None
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -54,6 +57,7 @@ class EmailMessage:
             "source_plugin": self.source_plugin,
             "organization_id": str(self.organization_id) if self.organization_id else None,
             "user_id": str(self.user_id) if self.user_id else None,
+            "shield_address": self.shield_address,
         }
     
     @classmethod
@@ -82,6 +86,9 @@ class EmailMessage:
         to_field = webhook_data.get("To", "")
         to_addresses = [addr.strip() for addr in to_field.split(",") if addr.strip()] if to_field else []
         
+        # Set shield address from primary To field
+        shield_address = to_addresses[0] if to_addresses else None
+        
         return cls(
             from_address=webhook_data.get("From", ""),
             to_addresses=to_addresses,
@@ -91,7 +98,8 @@ class EmailMessage:
             html_content=webhook_data.get("HtmlBody") or "",  # Handle None by converting to empty string
             headers=headers,
             attachments=attachments,
-            source_plugin="postmark"
+            source_plugin="postmark",
+            shield_address=shield_address
         )
     
     @classmethod

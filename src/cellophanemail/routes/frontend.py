@@ -3,7 +3,7 @@
 from litestar import get
 from litestar.controller import Controller
 from litestar.response import Template
-from cellophanemail.config.pricing import (
+from ..config.pricing import (
     get_plan_details,
     get_addon_pack_details,
     TRIAL_PERIOD_DAYS

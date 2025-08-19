@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from enum import Enum
 from pydantic import BaseModel, EmailStr
-from cellophanemail.config.settings import get_settings
+from ..config.settings import get_settings
 
 
 class TokenType(Enum):

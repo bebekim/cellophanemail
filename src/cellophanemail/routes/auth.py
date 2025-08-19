@@ -8,13 +8,13 @@ from litestar.status_codes import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_3
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
-from cellophanemail.services.auth_service import (
+from ..services.auth_service import (
     validate_email_unique,
     create_user,
     verify_password
 )
-from cellophanemail.config.settings import get_settings
-from cellophanemail.middleware.jwt_auth import jwt_auth_required
+from ..config.settings import get_settings
+from ..middleware.jwt_auth import jwt_auth_required
 
 
 class UserRegistration(BaseModel):

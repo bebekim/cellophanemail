@@ -9,23 +9,15 @@ from litestar.controller import Controller
 from litestar.status_codes import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 from pydantic import BaseModel
 
-from ..services.user_service import UserService
-from ..core.email_processor import EmailProcessor
 from ..core.email_message import EmailMessage
 
-# Feature flag for new provider/feature architecture migration  
-USE_NEW_ARCHITECTURE = os.getenv("USE_NEW_ARCHITECTURE", "true").lower() == "true"
+# Use new provider/feature architecture (legacy support removed)
+from ..providers.postmark.provider import PostmarkProvider
+from ..features.email_protection import EmailProtectionProcessor
+from ..features.shield_addresses import ShieldAddressManager
 
-if USE_NEW_ARCHITECTURE:
-    from ..providers.postmark.provider import PostmarkProvider
-    from ..features.email_protection import EmailProtectionProcessor
-    from ..features.shield_addresses import ShieldAddressManager
-    logger = logging.getLogger(__name__)
-    logger.info("Using new provider/feature architecture for email processing")
-else:
-    from ..adapters.email_processing_adapter import email_processing_adapter
-    logger = logging.getLogger(__name__)
-    logger.info("Using legacy architecture for email processing")
+logger = logging.getLogger(__name__)
+logger.info("Using new provider/feature architecture for email processing")
 
 
 class PostmarkWebhookPayload(BaseModel):
@@ -87,28 +79,20 @@ class WebhookController(Controller):
             raise ValueError(self._error_response("Invalid domain", message_id, HTTP_400_BAD_REQUEST))
     
     async def _get_user(self, shield_address: str, message_id: str) -> Dict[str, Any]:
-        """Lookup user by shield address."""
-        if USE_NEW_ARCHITECTURE:
-            # Use new shield address manager
-            shield_manager = ShieldAddressManager()
-            shield_info = await shield_manager.lookup_user_by_shield_address(shield_address)
-            if not shield_info:
-                logger.warning(f"No active user found for shield address: {shield_address}")
-                raise ValueError(self._error_response("Shield address not found", message_id, HTTP_404_NOT_FOUND))
-            
-            # Convert to legacy format
-            return {
-                "id": shield_info.user_id,
-                "email": shield_info.user_email,
-                "organization": shield_info.organization_id
-            }
-        else:
-            # Use legacy user service
-            user = await UserService.get_user_by_shield_address(shield_address)
-            if not user:
-                logger.warning(f"No active user found for shield address: {shield_address}")
-                raise ValueError(self._error_response("Shield address not found", message_id, HTTP_404_NOT_FOUND))
-            return user
+        """Lookup user by shield address using new architecture."""
+        # Use new shield address manager
+        shield_manager = ShieldAddressManager()
+        shield_info = await shield_manager.lookup_user_by_shield_address(shield_address)
+        if not shield_info:
+            logger.warning(f"No active user found for shield address: {shield_address}")
+            raise ValueError(self._error_response("Shield address not found", message_id, HTTP_404_NOT_FOUND))
+        
+        # Convert to legacy format for compatibility
+        return {
+            "id": shield_info.user_id,
+            "email": shield_info.user_email,
+            "organization": shield_info.organization_id
+        }
     
     def _prepare_email(self, data: PostmarkWebhookPayload, user: Dict[str, Any]) -> EmailMessage:
         """Create EmailMessage with user context."""
@@ -135,46 +119,42 @@ class WebhookController(Controller):
         return user.get(field) if isinstance(user, dict) else getattr(user, field, None)
     
     async def _process_email(self, email_message: EmailMessage) -> Any:
-        """Process email through Four Horsemen AI analysis."""
-        if USE_NEW_ARCHITECTURE:
-            logger.info(f"Processing email {email_message.message_id} via new provider/feature architecture")
-            
-            # Use new architecture components directly
-            shield_manager = ShieldAddressManager()
-            protection = EmailProtectionProcessor()
-            
-            # Look up shield address to get user info
-            shield_info = await shield_manager.lookup_user_by_shield_address(email_message.shield_address or email_message.to_addresses[0])
-            if not shield_info:
-                # Return a result that will cause 404
-                class NotFoundResult:
-                    should_forward = False
-                    toxicity_score = 0.0
-                    processing_time_ms = 0
-                    block_reason = "Shield address not found"
-                    horsemen_detected = []
-                return NotFoundResult()
-            
-            # Process through protection feature
-            protection_result = await protection.process_email(
-                email_message,
-                user_email=shield_info.user_email,
-                organization_id=shield_info.organization_id
-            )
-            
-            # Convert to legacy format for compatibility
-            class LegacyCompatResult:
-                def __init__(self, result):
-                    self.should_forward = result.should_forward
-                    self.toxicity_score = result.analysis.toxicity_score if result.analysis else 0.0
-                    self.processing_time_ms = result.analysis.processing_time_ms if result.analysis else 0
-                    self.block_reason = result.block_reason
-                    self.horsemen_detected = [h.horseman for h in (result.analysis.horsemen_detected if result.analysis else [])]
-            
-            return LegacyCompatResult(protection_result)
-        else:
-            logger.info(f"Processing email {email_message.message_id} via legacy architecture")
-            return await email_processing_adapter.process(email_message)
+        """Process email through new provider/feature architecture."""
+        logger.info(f"Processing email {email_message.message_id} via new provider/feature architecture")
+        
+        # Use new architecture components directly
+        shield_manager = ShieldAddressManager()
+        protection = EmailProtectionProcessor()
+        
+        # Look up shield address to get user info
+        shield_info = await shield_manager.lookup_user_by_shield_address(email_message.shield_address or email_message.to_addresses[0])
+        if not shield_info:
+            # Return a result that will cause 404
+            class NotFoundResult:
+                should_forward = False
+                toxicity_score = 0.0
+                processing_time_ms = 0
+                block_reason = "Shield address not found"
+                horsemen_detected = []
+            return NotFoundResult()
+        
+        # Process through protection feature
+        protection_result = await protection.process_email(
+            email_message,
+            user_email=shield_info.user_email,
+            organization_id=shield_info.organization_id
+        )
+        
+        # Convert to legacy format for compatibility
+        class LegacyCompatResult:
+            def __init__(self, result):
+                self.should_forward = result.should_forward
+                self.toxicity_score = result.analysis.toxicity_score if result.analysis else 0.0
+                self.processing_time_ms = result.analysis.processing_time_ms if result.analysis else 0
+                self.block_reason = result.block_reason
+                self.horsemen_detected = [h.horseman for h in (result.analysis.horsemen_detected if result.analysis else [])]
+        
+        return LegacyCompatResult(protection_result)
     
     def _build_response(self, result: Any, message_id: str, user: Dict[str, Any]) -> Response:
         """Build response based on processing result."""

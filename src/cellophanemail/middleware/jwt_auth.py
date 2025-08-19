@@ -5,8 +5,8 @@ from litestar import Request, Response
 from litestar.connection import ASGIConnection
 from litestar.middleware import AbstractAuthenticationMiddleware, AuthenticationResult
 from litestar.exceptions import NotAuthorizedException
-from cellophanemail.services.jwt_service import verify_token, TokenType, JWTError, TokenPayload
-from cellophanemail.models.user import User
+from ..services.jwt_service import verify_token, TokenType, JWTError, TokenPayload
+from ..models.user import User
 
 
 class JWTUser:

@@ -100,14 +100,14 @@ class EmailProtectionProcessor:
             parts.append(f"Subject: {email.subject}")
         
         # Include text body
-        if email.text_body:
-            parts.append(email.text_body)
+        if email.text_content:
+            parts.append(email.text_content)
         
         # If no text body, try to extract from HTML (simplified)
-        elif email.html_body:
+        elif email.html_content:
             # In production, use proper HTML parsing
             import re
-            text = re.sub('<[^<]+?>', '', email.html_body)
+            text = re.sub('<[^<]+?>', '', email.html_content)
             parts.append(text)
         
         return "\n".join(parts)
