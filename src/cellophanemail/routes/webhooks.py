@@ -1,6 +1,7 @@
 """Webhook endpoints for email processing - Single file refactored version."""
 
 import logging
+import os
 from typing import Dict, Any, List, Optional
 
 from litestar import post, Request, Response
@@ -12,7 +13,16 @@ from ..services.user_service import UserService
 from ..core.email_processor import EmailProcessor
 from ..core.email_message import EmailMessage
 
-logger = logging.getLogger(__name__)
+# Feature flag for vertical slice architecture migration
+USE_VERTICAL_SLICE = os.getenv("USE_VERTICAL_SLICE", "true").lower() == "true"
+
+if USE_VERTICAL_SLICE:
+    from ..adapters.email_processing_adapter import email_processing_adapter
+    logger = logging.getLogger(__name__)
+    logger.info("Using Vertical Slice Architecture for email processing")
+else:
+    logger = logging.getLogger(__name__)
+    logger.info("Using traditional layered architecture for email processing")
 
 
 class PostmarkWebhookPayload(BaseModel):
@@ -103,8 +113,12 @@ class WebhookController(Controller):
     
     async def _process_email(self, email_message: EmailMessage) -> Any:
         """Process email through Four Horsemen AI analysis."""
-        processor = EmailProcessor()
-        return await processor.process(email_message)
+        if USE_VERTICAL_SLICE:
+            logger.info(f"Processing email {email_message.message_id} via vertical slice")
+            return await email_processing_adapter.process(email_message)
+        else:
+            processor = EmailProcessor()
+            return await processor.process(email_message)
     
     def _build_response(self, result: Any, message_id: str, user: Dict[str, Any]) -> Response:
         """Build response based on processing result."""

@@ -12,10 +12,11 @@ from litestar.contrib.jinja import JinjaTemplateEngine
 from litestar.template.config import TemplateConfig
 from pathlib import Path
 
-from cellophanemail.config.settings import get_settings
-from cellophanemail.routes import health, webhooks, auth, frontend
-from cellophanemail.plugins.manager import PluginManager
-from cellophanemail.middleware.jwt_auth import JWTAuthenticationMiddleware
+from .config.settings import get_settings
+from .routes import health, webhooks, auth, frontend
+from .plugins.manager import PluginManager
+from .middleware.jwt_auth import JWTAuthenticationMiddleware
+from .providers.postmark.webhook import PostmarkWebhookHandler
 
 
 @get("/favicon.ico")
@@ -47,7 +48,7 @@ def create_app() -> Litestar:
             secret=settings.secret_key,
             cookie_name="cellophane_csrf",
             header_name="X-CSRF-Token",
-            exclude=["/webhooks/*", "/health/*"],  # Webhooks need to work without CSRF
+            exclude=["/webhooks/*", "/health/*", "/providers/*"],  # Webhooks and providers need to work without CSRF
             safe_methods=["GET", "HEAD", "OPTIONS"],
         )
     
@@ -80,8 +81,9 @@ def create_app() -> Litestar:
             favicon,
             frontend.router,  # Frontend pages (landing, pricing, etc.)
             health.router,
-            webhooks.router,
+            webhooks.router,  # Legacy webhooks (will migrate later)
             auth.router,
+            PostmarkWebhookHandler,  # New provider-based webhook
         ],
         cors_config=cors_config,
         csrf_config=csrf_config,
