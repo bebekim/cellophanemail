@@ -53,9 +53,10 @@ class EmailLog(Table, tablename="email_logs"):
     horsemen_detected = JSON(default=[])  # List of detected patterns
     blocked_content = Boolean(default=False)
     
-    # Content (encrypted in production)
-    original_content = Text(null=True)
-    filtered_content = Text(null=True)
+    # Content (compressed and with retention policy for cost optimization)
+    original_content = Text(null=True)  # Compressed in production
+    filtered_content = Text(null=True)  # Compressed in production
+    content_archived = Boolean(default=False)  # Moved to cheaper storage
     
     # Processing metadata
     processing_time_ms = Decimal(digits=(10, 2), null=True)

@@ -4,15 +4,16 @@ All pricing values are in USD.
 """
 
 # Starter Plan Configuration
-STARTER_PRICE = 5
-STARTER_EMAILS = 100
+STARTER_PRICE = 1
+STARTER_EMAILS = 50
 
-# Professional Plan Configuration  
-PROFESSIONAL_PRICE = 10
+# Plus Plan Configuration  
+PLUS_PRICE = 2
+PLUS_EMAILS = 150
+
+# Professional Plan Configuration
+PROFESSIONAL_PRICE = 5
 PROFESSIONAL_EMAILS = 500
-
-# Unlimited Plan Configuration
-UNLIMITED_PRICE = 25
 
 # Add-on Pack Configuration
 ADDON_PACK_PRICE = 2
@@ -28,15 +29,15 @@ PLAN_CONFIGS = {
         "emails": STARTER_EMAILS,
         "description": f"Starter plan with {STARTER_EMAILS} emails"
     },
+    "plus": {
+        "price": PLUS_PRICE,
+        "emails": PLUS_EMAILS,
+        "description": f"Plus plan with {PLUS_EMAILS} emails"
+    },
     "professional": {
         "price": PROFESSIONAL_PRICE,
         "emails": PROFESSIONAL_EMAILS,
         "description": f"Professional plan with {PROFESSIONAL_EMAILS} emails"
-    },
-    "unlimited": {
-        "price": UNLIMITED_PRICE,
-        "emails": None,
-        "description": "Unlimited plan with unlimited emails"
     }
 }
 
@@ -65,7 +66,7 @@ def get_plan_details(plan_name: str) -> dict:
     Get plan details for a given plan name.
     
     Args:
-        plan_name: Name of the plan ("starter", "professional", "unlimited")
+        plan_name: Name of the plan ("starter", "plus", "professional")
         
     Returns:
         Dictionary containing plan details
@@ -79,25 +80,22 @@ def get_plan_details(plan_name: str) -> dict:
     return plan_config
 
 
-def calculate_email_limit(plan_name: str, addon_packs: int = 0) -> int | None:
+def calculate_email_limit(plan_name: str, addon_packs: int = 0) -> int:
     """
     Calculate the total email limit for a plan including add-on packs.
     
     Args:
-        plan_name: Name of the plan ("starter", "professional", "unlimited")
+        plan_name: Name of the plan ("starter", "plus", "professional")
         addon_packs: Number of add-on packs purchased
         
     Returns:
-        Total email limit or None for unlimited plans
+        Total email limit
         
     Raises:
         ValueError: If plan_name is not recognized
     """
     normalized_name = _validate_plan_name(plan_name)
     base_emails = PLAN_CONFIGS[normalized_name]["emails"]
-    
-    if base_emails is None:  # Unlimited plan
-        return None
     
     return base_emails + (addon_packs * ADDON_PACK_EMAILS)
 
@@ -107,7 +105,7 @@ def calculate_usage_percentage(plan_name: str, emails_used: int, addon_packs: in
     Calculate the usage percentage for a given plan and usage.
     
     Args:
-        plan_name: Name of the plan ("starter", "professional", "unlimited")
+        plan_name: Name of the plan ("starter", "plus", "professional")
         emails_used: Number of emails used
         addon_packs: Number of add-on packs purchased
         
@@ -117,16 +115,7 @@ def calculate_usage_percentage(plan_name: str, emails_used: int, addon_packs: in
     Raises:
         ValueError: If plan_name is not recognized
     """
-    normalized_name = _validate_plan_name(plan_name)
-    
-    if PLAN_CONFIGS[normalized_name]["emails"] is None:  # Unlimited plan
-        return 0.0
-    
     email_limit = calculate_email_limit(plan_name, addon_packs)
-    
-    if email_limit is None:
-        return 0.0  # Should not happen for non-unlimited plans
-    
     return (emails_used / email_limit) * 100.0
 
 
