@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cellophanemail-pro"
+version = "0.1.0"
+description = "Commercial email protection features with advanced AI and premium providers"
+authors = [
+    {name = "CellophoneMail Team", email = "hello@cellophanemail.com"}
+]
+license = {text = "Commercial"}
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = ["email", "protection", "ai", "postmark", "commercial"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Communications :: Email",
+    "Topic :: Security",
+]
+
+dependencies = [
+    "cellophanemail>=0.1.0",
+    "anthropic>=0.8.1",
+    "openai>=1.3.0", 
+    "postmark>=1.0.0",
+    "sendgrid>=6.10.0",
+    "boto3>=1.34.0",  # For AWS SES
+    "azure-communication-email>=1.0.0",  # For Azure
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.12.0",
+    "black>=23.0",
+    "isort>=5.12.0",
+    "mypy>=1.7.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://cellophanemail.com/pro"
+Documentation = "https://docs.cellophanemail.com/pro"
+Repository = "https://github.com/cellophanemail/cellophanemail-pro"
+Support = "https://cellophanemail.com/support"
+
+[project.scripts]
+cellophanemail-pro = "cellophanemail_pro.cli:main"
+
+[project.entry-points."cellophanemail.providers"]
+postmark = "cellophanemail_pro.providers.postmark:PostmarkProvider"
+sendgrid = "cellophanemail_pro.providers.sendgrid:SendGridProvider"
+aws_ses = "cellophanemail_pro.providers.aws_ses:SESProvider"
+
+[project.entry-points."cellophanemail.analyzers"]
+ai_advanced = "cellophanemail_pro.features.ai_advanced:AdvancedAnalyzer"
+sentiment = "cellophanemail_pro.features.sentiment:SentimentAnalyzer"
+threat_intel = "cellophanemail_pro.features.threat_intel:ThreatIntelligence"
+
+[tool.setuptools]
+package-dir = {"" = "../../src"}
+
+[tool.setuptools.packages.find]
+where = ["../../src"]
+include = [
+    "cellophanemail_pro*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["../../tests/commercial"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

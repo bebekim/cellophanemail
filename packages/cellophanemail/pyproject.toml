@@ -1,0 +1,101 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cellophanemail"
+version = "0.1.0"
+description = "Open source email protection with AI-powered toxicity detection"
+authors = [
+    {name = "CellophoneMail Team", email = "hello@cellophanemail.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = ["email", "protection", "toxicity", "ai", "smtp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Communications :: Email",
+    "Topic :: Security",
+]
+
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "aiohttp>=3.9.0",
+    "python-multipart>=0.0.6",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "piccolo[postgres]>=1.11.0",
+    "google-auth>=2.25.0",
+    "google-auth-oauthlib>=1.1.0",
+    "google-auth-httplib2>=0.2.0",
+    "gmail-python>=0.1.0",
+    "aiosmtpd>=1.4.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.12.0",
+    "black>=23.0",
+    "isort>=5.12.0",
+    "mypy>=1.7.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://cellophanemail.com"
+Documentation = "https://docs.cellophanemail.com"
+Repository = "https://github.com/cellophanemail/cellophanemail"
+"Bug Tracker" = "https://github.com/cellophanemail/cellophanemail/issues"
+
+[project.scripts]
+cellophanemail = "cellophanemail.cli:main"
+
+[project.entry-points."cellophanemail.providers"]
+smtp = "cellophanemail.providers.smtp:SMTPProvider"
+gmail = "cellophanemail.providers.gmail:GmailProvider"
+
+[tool.setuptools]
+package-dir = {"" = "../../src"}
+
+[tool.setuptools.packages.find]
+where = ["../../src"]
+include = [
+    "cellophanemail*",
+]
+exclude = [
+    "cellophanemail.providers.postmark*",
+    "cellophanemail.features.ai_advanced*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["../../tests/open_source"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

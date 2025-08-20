@@ -1,0 +1,108 @@
+name: Sync Distribution Repositories
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '.github/**'
+      - 'tools/**'
+      - 'packages/**'
+
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target repos to sync'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - oss
+          - commercial
+
+jobs:
+  sync-repos:
+    runs-on: ubuntu-latest
+    if: github.repository == 'cellophanemail/cellophanemail-internal'
+    
+    steps:
+      - name: Checkout internal repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.REPO_SYNC_TOKEN }}
+          fetch-depth: 0
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Clone distribution repositories
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_SYNC_TOKEN }}
+        run: |
+          # Clone OSS repo
+          git clone https://${GITHUB_TOKEN}@github.com/cellophanemail/cellophanemail.git ../cellophanemail-oss
+          
+          # Clone commercial repo
+          git clone https://${GITHUB_TOKEN}@github.com/cellophanemail/cellophanemail-pro.git ../cellophanemail-pro
+      
+      - name: Configure git
+        run: |
+          git config --global user.name "CellophoneMail Bot"
+          git config --global user.email "bot@cellophanemail.com"
+          
+          # Configure distribution repos
+          cd ../cellophanemail-oss
+          git config user.name "CellophoneMail Bot"
+          git config user.email "bot@cellophanemail.com"
+          
+          cd ../cellophanemail-pro
+          git config user.name "CellophoneMail Bot"
+          git config user.email "bot@cellophanemail.com"
+      
+      - name: Sync repositories
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          TARGET="${{ github.event.inputs.target || 'both' }}"
+          python tools/sync-repos.py \
+            --target="$TARGET" \
+            --commit-message="Sync from internal repo: ${GITHUB_SHA:0:8}" \
+            --oss-repo="../cellophanemail-oss" \
+            --commercial-repo="../cellophanemail-pro"
+      
+      - name: Trigger package builds
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_SYNC_TOKEN }}
+        run: |
+          # Trigger OSS package build
+          curl -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/cellophanemail/cellophanemail/dispatches \
+            -d '{"event_type":"build-package","client_payload":{"ref":"main"}}'
+          
+          # Trigger commercial package build
+          curl -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/cellophanemail/cellophanemail-pro/dispatches \
+            -d '{"event_type":"build-package","client_payload":{"ref":"main"}}'
+      
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "✅ Successfully synced repositories!"
+          echo "- OSS: https://github.com/cellophanemail/cellophanemail"
+          echo "- Pro: https://github.com/cellophanemail/cellophanemail-pro"
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Repository sync failed!"
+          echo "Check the logs above for details."
+          exit 1
