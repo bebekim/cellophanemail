@@ -8,19 +8,22 @@ from ...providers.contracts import EmailMessage
 from .analyzer import FourHorsemenAnalyzer
 from .models import ProtectionResult, ThreatLevel
 from .storage import ProtectionLogStorage
+from .shared_context import SharedContext
+from .llm_analyzer import SimpleLLMAnalyzer
 
 logger = logging.getLogger(__name__)
 
 
 class EmailProtectionProcessor:
     """
-    Processes emails through protection pipeline.
-    Self-contained - doesn't depend on external services.
+    Processes emails through protection pipeline with shared context.
+    Now includes iterative analysis through 4 phases.
     """
     
-    def __init__(self):
+    def __init__(self, llm_analyzer: Optional[SimpleLLMAnalyzer] = None):
         self.analyzer = FourHorsemenAnalyzer()
         self.storage = ProtectionLogStorage()
+        self.shared_context = SharedContext(llm_analyzer)
         
     async def process_email(
         self, 
@@ -29,7 +32,16 @@ class EmailProtectionProcessor:
         organization_id: Optional[str] = None
     ) -> ProtectionResult:
         """
-        Process an email through the protection pipeline.
+        Process an email through enhanced protection pipeline with shared context.
+        
+        New flow:
+        1. Start new email in shared context
+        2. Phase 1: Extract facts and analyze manner
+        3. Phase 2: Summarize fact presentation patterns
+        4. Phase 3: Analyze non-factual content
+        5. Phase 4: Extract implicit messages
+        6. Enhanced Four Horsemen analysis
+        7. Make protection decision
         
         Args:
             email: The email message to process
@@ -37,15 +49,33 @@ class EmailProtectionProcessor:
             organization_id: Optional organization ID for quota checking
             
         Returns:
-            ProtectionResult with decision and analysis
+            ProtectionResult with enhanced analysis and reasoning
         """
-        logger.info(f"Processing email {email.message_id} for protection")
+        logger.info(f"Processing email {email.message_id} for protection with shared context")
         
         # Prepare content for analysis
         content = self._prepare_content(email)
         
-        # Analyze content
-        analysis = self.analyzer.analyze(content, email.from_address)
+        # Start new email analysis in shared context
+        self.shared_context.start_new_email(content, email.from_address)
+        
+        # Phase 1: Extract facts and analyze their manner
+        phase1_result = self.shared_context.update_phase1_facts()
+        logger.debug(f"Phase 1 complete: {phase1_result.data['total_facts']} facts, "
+                    f"ratio: {phase1_result.data['fact_ratio']:.2f}")
+        
+        # Phase 2: Summarize manner patterns
+        phase2_result = self.shared_context.update_phase2_manner_summary()
+        if phase2_result:
+            logger.debug(f"Phase 2 complete: {phase2_result.data['overall_manner']}")
+        
+        # Phase 3: Analyze non-factual content
+        phase3_result = self.shared_context.update_phase3_non_factual()
+        logger.debug(f"Phase 3 complete: {len(phase3_result.data['personal_attack_indicators'])} attacks")
+        
+        # Phase 4: Extract implicit messages
+        phase4_result = self.shared_context.update_phase4_implicit()
+        logger.debug(f"Phase 4 complete: {len(phase4_result.data['implicit_threats'])} implicit threats")
         
         # Check organization limits if applicable
         if organization_id:
@@ -61,33 +91,27 @@ class EmailProtectionProcessor:
                     message_id=email.message_id
                 )
         
-        # Make forwarding decision
-        should_forward = analysis.safe and analysis.threat_level in [ThreatLevel.SAFE, ThreatLevel.LOW]
+        # Enhanced Four Horsemen analysis with shared context
+        analysis = self._enhanced_four_horsemen_analysis(content, email.from_address)
         
-        # Determine block reason if not forwarding
-        block_reason = None
-        if not should_forward:
-            if analysis.horsemen_detected:
-                horsemen = ", ".join([h.horseman for h in analysis.horsemen_detected])
-                block_reason = f"Detected harmful content: {horsemen}"
-            else:
-                block_reason = f"Threat level too high: {analysis.threat_level.value}"
+        # Enhanced protection decision
+        should_forward, enhanced_block_reason = self._make_enhanced_protection_decision(analysis)
         
-        # Create result
+        # Create enhanced result
         result = ProtectionResult(
             should_forward=should_forward,
             analysis=analysis,
-            block_reason=block_reason,
+            block_reason=enhanced_block_reason,
             forwarded_to=[user_email] if should_forward else None,
             logged_at=datetime.now(),
             message_id=email.message_id
         )
         
-        # Log the decision
+        # Enhanced logging with shared context
         await self.storage.log_protection_decision(email, result)
         
-        logger.info(f"Email {email.message_id} protection decision: "
-                   f"forward={should_forward}, threat_level={analysis.threat_level.value}")
+        logger.info(f"Email {email.message_id} enhanced protection decision: "
+                   f"forward={should_forward}, context_iteration={self.shared_context.iteration}")
         
         return result
     
@@ -115,6 +139,121 @@ class EmailProtectionProcessor:
             parts.append(text)
         
         return "\n".join(parts)
+    
+    def _enhanced_four_horsemen_analysis(self, content: str, sender: str):
+        """
+        Enhanced Four Horsemen analysis incorporating shared context insights.
+        """
+        # Get standard Four Horsemen analysis
+        base_analysis = self.analyzer.analyze(content, sender)
+        
+        # Get current analysis summary from shared context
+        context_summary = self.shared_context.get_current_analysis_summary()
+        
+        # Enhance analysis with context insights
+        fact_ratio = context_summary.get("fact_ratio", 0.0)
+        phases = context_summary.get("phases", {})
+        
+        # Adjust toxicity score based on context
+        enhanced_toxicity = base_analysis.toxicity_score
+        
+        # Low fact ratio indicates more manipulation
+        if fact_ratio < 0.2:
+            enhanced_toxicity = min(1.0, enhanced_toxicity + 0.15)
+        
+        # Negative fact manner boosts contempt/criticism
+        manner_data = phases.get("manner_summary", {})
+        if manner_data.get("overall_manner") == "predominantly_negative":
+            enhanced_toxicity = min(1.0, enhanced_toxicity + 0.1)
+        
+        # Personal attacks boost criticism
+        non_factual_data = phases.get("non_factual_analysis", {})
+        personal_attacks = len(non_factual_data.get("personal_attack_indicators", []))
+        if personal_attacks > 0:
+            enhanced_toxicity = min(1.0, enhanced_toxicity + (personal_attacks * 0.05))
+        
+        # Implicit threats are serious
+        implicit_data = phases.get("implicit_analysis", {})
+        implicit_threats = len(implicit_data.get("implicit_threats", []))
+        if implicit_threats > 0:
+            enhanced_toxicity = min(1.0, enhanced_toxicity + (implicit_threats * 0.1))
+        
+        # Update the analysis with enhanced toxicity score
+        base_analysis.toxicity_score = enhanced_toxicity
+        
+        # Recalculate threat level based on enhanced score
+        if enhanced_toxicity > 0.7:
+            base_analysis.threat_level = ThreatLevel.HIGH
+        elif enhanced_toxicity > 0.5:
+            base_analysis.threat_level = ThreatLevel.MEDIUM
+        elif enhanced_toxicity > 0.3:
+            base_analysis.threat_level = ThreatLevel.LOW
+        else:
+            base_analysis.threat_level = ThreatLevel.SAFE
+            
+        # Update safety determination
+        base_analysis.safe = enhanced_toxicity < 0.3
+        
+        return base_analysis
+    
+    def _make_enhanced_protection_decision(self, analysis) -> tuple[bool, Optional[str]]:
+        """
+        Make protection decision with enhanced reasoning from shared context.
+        
+        Returns:
+            tuple: (should_forward, detailed_block_reason)
+        """
+        # Base decision
+        should_forward = analysis.safe and analysis.threat_level in [ThreatLevel.SAFE, ThreatLevel.LOW]
+        
+        if should_forward:
+            return True, None
+        
+        # Enhanced block reasoning with context
+        context_summary = self.shared_context.get_current_analysis_summary()
+        phases = context_summary.get("phases", {})
+        
+        # Build detailed block reason
+        reasons = []
+        
+        # Fact-based reasoning
+        fact_ratio = context_summary.get("fact_ratio", 0.0)
+        if fact_ratio < 0.2:
+            reasons.append(f"Email is {(1-fact_ratio)*100:.1f}% non-factual content")
+        
+        # Manner-based reasoning
+        manner_data = phases.get("manner_summary", {})
+        overall_manner = manner_data.get("overall_manner", "unknown")
+        if overall_manner == "predominantly_negative":
+            negative_ratio = manner_data.get("negative_ratio", 0.0)
+            reasons.append(f"Facts presented in negative manner ({negative_ratio:.1%} of facts)")
+        
+        # Personal attack reasoning
+        non_factual_data = phases.get("non_factual_analysis", {})
+        personal_attacks = non_factual_data.get("personal_attack_indicators", [])
+        if personal_attacks:
+            reasons.append(f"Contains personal attacks: {', '.join(personal_attacks)}")
+        
+        # Implicit threat reasoning
+        implicit_data = phases.get("implicit_analysis", {})
+        implicit_threats = implicit_data.get("implicit_threats", [])
+        if implicit_threats:
+            reasons.append(f"Implicit threats detected: {', '.join(implicit_threats)}")
+        
+        # Four Horsemen reasoning
+        if analysis.horsemen_detected:
+            horsemen = [h.horseman for h in analysis.horsemen_detected]
+            reasons.append(f"Four Horsemen patterns: {', '.join(horsemen)}")
+        
+        # Historical context reasoning
+        historical = context_summary.get("historical_context", {})
+        if historical.get("escalation_detected"):
+            reasons.append(f"Escalation pattern detected over {historical.get('previous_iterations', 0)} emails")
+        
+        # Combine all reasons
+        detailed_reason = " | ".join(reasons) if reasons else f"Threat level: {analysis.threat_level.value}"
+        
+        return False, detailed_reason
     
     async def _check_org_limits(self, organization_id: str) -> bool:
         """
