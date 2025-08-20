@@ -1,0 +1,29 @@
+{
+  "summary": {
+    "accuracy": 100.0,
+    "total_samples": 1,
+    "correct_predictions": 1,
+    "test_mode": "hybrid",
+    "timestamp": "2025-08-20T12:11:28.128381"
+  },
+  "detailed_results": [
+    {
+      "sample_id": "en_safe_001",
+      "language": "en",
+      "category": "business_communication",
+      "expected_classification": "SAFE",
+      "expected_horsemen": [],
+      "actual_classification": "SAFE",
+      "actual_horsemen": [],
+      "reasoning": "Local analysis - content appears safe",
+      "correct_classification": true,
+      "cost_optimization": "hybrid_local_only"
+    }
+  ],
+  "statistics": {
+    "total": 1,
+    "correct": 1,
+    "expected_SAFE": 1,
+    "actual_SAFE": 1
+  }
+}
