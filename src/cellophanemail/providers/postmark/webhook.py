@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 from litestar import post, Response, Request
 from litestar.controller import Controller
 from litestar.status_codes import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from .provider import PostmarkProvider
 from ..contracts import EmailMessage
@@ -38,10 +38,48 @@ class PostmarkWebhookHandler(Controller):
     path = "/providers/postmark"
     
     @post("/inbound")
-    async def handle_inbound(self, request: Request, data: PostmarkWebhookPayload) -> Response:
+    async def handle_inbound(self, request: Request, data: Dict[str, Any]) -> Response:
         """Handle Postmark inbound email webhook."""
         try:
-            logger.info(f"Received Postmark webhook for message {data.MessageID}")
+            # First, validate the incoming data structure
+            try:
+                webhook_data = PostmarkWebhookPayload.model_validate(data)
+                logger.info(f"Received valid Postmark webhook for message {webhook_data.MessageID}")
+            except ValidationError as e:
+                # Log client info for monitoring/rate limiting
+                client_ip = request.client.host if request.client else "unknown"
+                user_agent = request.headers.get("user-agent", "unknown")
+                logger.warning(f"Invalid webhook payload from {client_ip} (UA: {user_agent[:50]}): {e}")
+                logger.debug(f"Payload received: {data}")
+                
+                # Handle common invalid cases gracefully
+                if not data or data == {}:
+                    # Empty request - likely health check, bot, or scanner
+                    logger.info(f"Empty webhook request from {client_ip} - possible health check or scanner")
+                    return Response(
+                        content={
+                            "status": "invalid", 
+                            "error": "Empty payload - expecting Postmark webhook data",
+                            "hint": "Use POST /providers/postmark/health for health checks"
+                        },
+                        status_code=HTTP_400_BAD_REQUEST
+                    )
+                
+                # Missing required fields
+                missing_fields = []
+                required_fields = ["From", "To", "Subject", "MessageID", "Date"]
+                for field in required_fields:
+                    if field not in data:
+                        missing_fields.append(field)
+                
+                return Response(
+                    content={
+                        "status": "invalid",
+                        "error": f"Missing required fields: {', '.join(missing_fields)}",
+                        "expected": "Valid Postmark inbound webhook payload"
+                    },
+                    status_code=HTTP_400_BAD_REQUEST
+                )
             
             # Initialize provider, protection, and shield address manager for this request
             provider = PostmarkProvider()
@@ -49,7 +87,7 @@ class PostmarkWebhookHandler(Controller):
             shield_manager = ShieldAddressManager()
             
             # Convert to common EmailMessage format
-            email_message = await provider.receive_message(data.model_dump())
+            email_message = await provider.receive_message(webhook_data.model_dump())
             
             # Validate it's for our domain
             if not email_message.shield_address:
@@ -107,3 +145,15 @@ class PostmarkWebhookHandler(Controller):
                 content={"error": str(e)},
                 status_code=HTTP_400_BAD_REQUEST
             )
+    
+    @post("/health")
+    async def health_check(self, request: Request) -> Response:
+        """Health check endpoint for monitoring."""
+        return Response(
+            content={
+                "status": "healthy",
+                "service": "postmark-webhook",
+                "endpoint": "/providers/postmark/inbound"
+            },
+            status_code=HTTP_200_OK
+        )

@@ -17,8 +17,12 @@ from cellophanemail.providers.postmark.provider import PostmarkProvider
 from cellophanemail.providers.contracts import EmailMessage, ProviderConfig
 
 
-async def test_dry_run():
+def test_dry_run():
     """Test Postmark provider in dry-run mode."""
+    asyncio.run(_test_dry_run())
+
+async def _test_dry_run():
+    """Internal async test function."""
     
     print("=" * 60)
     print("Testing Postmark Provider in DRY-RUN Mode")
@@ -90,8 +94,12 @@ async def test_dry_run():
                 print(f"   Contains {len(lines)} entries")
 
 
-async def test_with_registry():
+def test_with_registry():
     """Test using the provider registry."""
+    asyncio.run(_test_with_registry())
+
+async def _test_with_registry():
+    """Internal async test function."""
     from cellophanemail.providers.registry import get_provider_registry
     
     print("\n" + "=" * 60)

@@ -1,0 +1,54 @@
+{
+  "summary": {
+    "accuracy": 66.66666666666666,
+    "total_samples": 3,
+    "correct_predictions": 2,
+    "test_mode": "hybrid",
+    "timestamp": "2025-08-20T10:42:40.462267"
+  },
+  "detailed_results": [
+    {
+      "sample_id": "en_safe_001",
+      "language": "en",
+      "category": "business_communication",
+      "expected_classification": "SAFE",
+      "expected_horsemen": [],
+      "actual_classification": "SAFE",
+      "actual_horsemen": [],
+      "reasoning": "Local analysis - content appears safe",
+      "correct_classification": true,
+      "cost_optimization": "hybrid_local_only"
+    },
+    {
+      "sample_id": "en_safe_002",
+      "language": "en",
+      "category": "business_communication",
+      "expected_classification": "SAFE",
+      "expected_horsemen": [],
+      "actual_classification": "SAFE",
+      "actual_horsemen": [],
+      "reasoning": "Local analysis - content appears safe",
+      "correct_classification": true,
+      "cost_optimization": "hybrid_local_only"
+    },
+    {
+      "sample_id": "en_warning_001",
+      "language": "en",
+      "category": "workplace_tension",
+      "expected_classification": "WARNING",
+      "expected_horsemen": [],
+      "actual_classification": "SAFE",
+      "actual_horsemen": [],
+      "reasoning": "Local analysis - content appears safe",
+      "correct_classification": false,
+      "cost_optimization": "hybrid_local_only"
+    }
+  ],
+  "statistics": {
+    "total": 3,
+    "correct": 2,
+    "expected_SAFE": 2,
+    "actual_SAFE": 3,
+    "expected_WARNING": 1
+  }
+}
