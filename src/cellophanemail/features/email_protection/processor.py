@@ -71,7 +71,7 @@ class EmailProtectionProcessor:
         
         # Phase 3: Analyze non-factual content
         phase3_result = self.shared_context.update_phase3_non_factual()
-        logger.debug(f"Phase 3 complete: {len(phase3_result.data['personal_attack_indicators'])} attacks")
+        logger.debug(f"Phase 3 complete: {len(phase3_result.data.get('personal_attacks', []))} attacks detected")
         
         # Phase 4: Extract implicit messages
         phase4_result = self.shared_context.update_phase4_implicit()
@@ -168,7 +168,7 @@ class EmailProtectionProcessor:
         
         # Personal attacks boost criticism
         non_factual_data = phases.get("non_factual_analysis", {})
-        personal_attacks = len(non_factual_data.get("personal_attack_indicators", []))
+        personal_attacks = len(non_factual_data.get("personal_attacks", []))
         if personal_attacks > 0:
             enhanced_toxicity = min(1.0, enhanced_toxicity + (personal_attacks * 0.05))
         
@@ -230,7 +230,7 @@ class EmailProtectionProcessor:
         
         # Personal attack reasoning
         non_factual_data = phases.get("non_factual_analysis", {})
-        personal_attacks = non_factual_data.get("personal_attack_indicators", [])
+        personal_attacks = non_factual_data.get("personal_attacks", [])
         if personal_attacks:
             reasons.append(f"Contains personal attacks: {', '.join(personal_attacks)}")
         

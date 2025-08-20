@@ -205,13 +205,13 @@ class SharedContext:
                 else:
                     raise ValueError(f"Unsupported provider: {self.llm_analyzer.provider}")
             else:
-                # Mock LLM response for testing
+                # Simple mock - static response for pipeline testing
                 result = """{
-                    "overall_manner": "PREDOMINANTLY_NEGATIVE",
-                    "reasoning": "Facts are presented in accusatory context with emotional pressure",
-                    "cultural_context": "Direct confrontational style typical in debt collection",
-                    "manipulation_detected": true,
-                    "emotional_loading": "high"
+                    "overall_manner": "MIXED",
+                    "reasoning": "Mock analysis for pipeline testing",
+                    "cultural_context": "Standard communication patterns",
+                    "manipulation_detected": false,
+                    "emotional_loading": "medium"
                 }"""
             
             # Parse JSON response
@@ -278,29 +278,27 @@ class SharedContext:
         
     def update_phase3_non_factual(self):
         """
-        Phase 3: Analyze non-factual content.
-        What remains after facts are removed - personal attacks, emotions, etc.
+        Phase 3: Enhanced hybrid analysis of non-factual content.
+        Uses LLM + pattern matching for sophisticated psychological analysis.
         """
         # Remove facts from content to get residual
         residual_content = self.current_email_content
         for fact in self.current_email_facts:
             residual_content = residual_content.replace(fact, "[FACT_REMOVED]")
-            
-        # Analyze residual content
-        residual_analysis = self._analyze_residual_content(residual_content)
-        self.non_factual_patterns.append(residual_analysis)
+        
+        # Hybrid analysis approach
+        if self.llm_analyzer and len(residual_content.strip()) > 10:
+            hybrid_analysis = self._hybrid_analyze_residual_content(residual_content)
+        else:
+            hybrid_analysis = self._pattern_analyze_residual_content(residual_content)
+        
+        self.non_factual_patterns.append(hybrid_analysis)
         
         phase_result = PhaseResult(
             phase="non_factual_analysis",
             iteration=self.iteration,
             timestamp=datetime.now(),
-            data={
-                "residual_content": residual_content,
-                "residual_word_count": len(residual_content.split()),
-                "personal_attack_indicators": residual_analysis.get("personal_attacks", []),
-                "emotional_indicators": residual_analysis.get("emotional_words", []),
-                "manipulation_indicators": residual_analysis.get("manipulation_patterns", [])
-            }
+            data=hybrid_analysis
         )
         self.phase_results.append(phase_result)
         
@@ -322,7 +320,11 @@ class SharedContext:
                 "implicit_threats": implicit_analysis.get("threats", []),
                 "power_dynamics": implicit_analysis.get("power_plays", []),
                 "emotional_manipulation": implicit_analysis.get("emotional_hooks", []),
-                "social_pressure": implicit_analysis.get("social_weapons", [])
+                "social_pressure": implicit_analysis.get("social_weapons", []),
+                "analysis_method": implicit_analysis.get("analysis_method", "unknown"),
+                "confidence": implicit_analysis.get("confidence", 0.0),
+                "reasoning": implicit_analysis.get("reasoning", ""),
+                "fallback_reason": implicit_analysis.get("fallback_reason", "")
             }
         )
         self.phase_results.append(phase_result)
@@ -361,7 +363,7 @@ class SharedContext:
             try:
                 return self._llm_extract_facts(content)
             except Exception as e:
-                logger.warning(f"LLM fact extraction failed: {e}. Using fallback.")
+                # logger.warning(f"LLM fact extraction failed: {e}. Using fallback.")
                 return self._regex_extract_facts(content)
         else:
             return self._regex_extract_facts(content)
@@ -423,15 +425,15 @@ class SharedContext:
                     raise ValueError(f"Unsupported provider: {self.llm_analyzer.provider}")
                     
             except Exception as e:
-                logger.error(f"LLM fact extraction failed: {e}")
+                # logger.error(f"LLM fact extraction failed: {e}")
                 raise
         
         else:
-            # Mock analyzer - simulate LLM response for testing
-            result = f"""
+            # Simple mock - static response for pipeline testing
+            result = """
             FACT: $500
-            FACT: last year
-            FACT: 3 months ago
+            FACT: last month
+            FACT: 3 times
             """
         
         # Parse LLM response
@@ -528,49 +530,443 @@ class SharedContext:
                 
         return fact  # Fallback if not found
         
-    def _analyze_residual_content(self, residual: str) -> Dict[str, List[str]]:
-        """Analyze non-factual content patterns."""
+    def _hybrid_analyze_residual_content(self, residual: str) -> Dict[str, Any]:
+        """
+        Hybrid approach: LLM analysis enhanced with pattern validation.
+        Provides sophisticated psychological analysis with cultural context.
+        """
+        try:
+            # Primary LLM analysis
+            llm_analysis = self._llm_analyze_residual_content(residual)
+            
+            # Pattern analysis for cross-validation
+            pattern_analysis = self._pattern_analyze_residual_content(residual)
+            
+            # Hybrid scoring and validation
+            hybrid_result = self._validate_and_merge_analysis(llm_analysis, pattern_analysis, residual)
+            
+            hybrid_result["analysis_method"] = "hybrid_llm_pattern"
+            return hybrid_result
+            
+        except Exception as e:
+            # Fallback to pattern analysis
+            fallback_result = self._pattern_analyze_residual_content(residual)
+            fallback_result["analysis_method"] = "pattern_fallback"
+            fallback_result["llm_fallback_reason"] = str(e)
+            return fallback_result
+    
+    def _llm_analyze_residual_content(self, residual: str) -> Dict[str, Any]:
+        """Use LLM for sophisticated psychological analysis of non-factual content."""
+        
+        prompt = f"""
+        Analyze the non-factual content in this email for psychological manipulation patterns.
+        
+        RESIDUAL CONTENT (after facts removed):
+        {residual}
+        
+        ORIGINAL EMAIL CONTEXT:
+        {self.current_email_content}
+        
+        Analyze for these psychological patterns:
+        
+        1. PERSONAL ATTACKS:
+        - Character assassination
+        - Identity attacks  
+        - Capability/competence attacks
+        - Appearance/physical attacks
+        
+        2. EMOTIONAL MANIPULATION:
+        - Guilt induction
+        - Shame tactics
+        - Fear mongering
+        - Emotional blackmail
+        
+        3. GASLIGHTING PATTERNS:
+        - Reality distortion
+        - Memory questioning  
+        - Self-doubt induction
+        - Sanity questioning
+        
+        4. SOCIAL MANIPULATION:
+        - Isolation tactics
+        - Reputation threats
+        - False consensus ("everyone thinks")
+        - Authority claims
+        
+        5. CONTROL TACTICS:
+        - Ultimatums
+        - Conditional threats
+        - Punishment threats
+        - Withdrawal threats
+        
+        Consider cultural context - different cultures express aggression differently.
+        
+        Respond in JSON format:
+        {{
+            "personal_attacks": ["specific attacks found"],
+            "emotional_manipulation": ["guilt/shame/fear tactics"],
+            "gaslighting_patterns": ["reality distortion examples"],
+            "social_manipulation": ["isolation/reputation threats"],
+            "control_tactics": ["ultimatums/threats"],
+            "cultural_context": "cultural interpretation notes",
+            "severity_score": 0.0-1.0,
+            "manipulation_sophistication": "low|medium|high",
+            "primary_tactic": "main manipulation strategy detected",
+            "confidence": 0.0-1.0
+        }}
+        """
+        
+        if hasattr(self.llm_analyzer, 'provider'):
+            # Real LLM providers
+            if self.llm_analyzer.provider == "anthropic":
+                response = self.llm_analyzer.client.messages.create(
+                    model=self.llm_analyzer.model_name,
+                    max_tokens=400,
+                    temperature=0.1,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                result = response.content[0].text.strip()
+                
+            elif self.llm_analyzer.provider == "openai":
+                response = self.llm_analyzer.client.chat.completions.create(
+                    model=self.llm_analyzer.model_name,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=400,
+                    temperature=0.1
+                )
+                result = response.choices[0].message.content.strip()
+            else:
+                raise ValueError(f"Unsupported provider: {self.llm_analyzer.provider}")
+        else:
+            # Simple mock - static response for pipeline testing
+            result = """{
+                "personal_attacks": ["mock attack"],
+                "emotional_manipulation": ["mock manipulation"],
+                "gaslighting_patterns": [],
+                "social_manipulation": [],
+                "control_tactics": [],
+                "cultural_context": "Standard communication patterns",
+                "severity_score": 0.3,
+                "manipulation_sophistication": "low",
+                "primary_tactic": "none",
+                "confidence": 0.7
+            }"""
+        
+        import json
+        return json.loads(result)
+    
+    def _pattern_analyze_residual_content(self, residual: str) -> Dict[str, Any]:
+        """Enhanced pattern analysis with multilingual support."""
         analysis = {
             "personal_attacks": [],
-            "emotional_words": [],
-            "manipulation_patterns": []
+            "emotional_manipulation": [],
+            "gaslighting_patterns": [],
+            "social_manipulation": [],
+            "control_tactics": [],
+            "cultural_context": "",
+            "severity_score": 0.0,
+            "manipulation_sophistication": "low",
+            "primary_tactic": "none",
+            "confidence": 0.7,
+            "analysis_method": "enhanced_patterns"
         }
         
-        # Simple pattern detection - can be enhanced
-        words = residual.lower().split()
+        residual_lower = residual.lower()
+        words = residual_lower.split()
         
-        attack_words = ["stupid", "selfish", "lazy", "worthless", "terrible", "awful"]
-        emotional_words = ["hate", "love", "angry", "sad", "disappointed", "hurt"]
-        manipulation_words = ["everyone", "always", "never", "should", "supposed to"]
+        # Enhanced multilingual patterns
+        patterns = {
+            "personal_attacks": {
+                "english": ["stupid", "idiot", "selfish", "lazy", "worthless", "terrible", "awful", "loser", "pathetic"],
+                "korean": ["바보", "멍청이", "한심", "쓸모없", "형편없"],
+                "spanish": ["estúpido", "idiota", "inútil", "patético", "terrible"],
+                "universal": ["🤬", "💩"]  # Emojis are universal
+            },
+            "emotional_manipulation": {
+                "english": ["disappointed", "hurt", "betrayed", "expected better", "thought you were"],
+                "korean": ["실망", "상처", "배신", "기대했는데"],
+                "spanish": ["decepcionado", "herido", "traicionado"],
+                "patterns": ["if you loved", "after everything", "how could you"]
+            },
+            "gaslighting": {
+                "english": ["you're imagining", "that never happened", "you're being dramatic", "you're too sensitive"],
+                "patterns": ["you always", "you never", "that's not what happened"]
+            },
+            "social_manipulation": {
+                "english": ["everyone knows", "people are talking", "others think", "everyone thinks"],
+                "korean": ["모든 사람이", "다들 알고", "사람들이 말하길"],
+                "patterns": ["tell everyone", "reputation", "embarrass you"]
+            },
+            "control_tactics": {
+                "english": ["or else", "you'll regret", "last chance", "final warning"],
+                "patterns": ["if you don't", "unless you", "you have to", "no choice"]
+            }
+        }
         
-        analysis["personal_attacks"] = [word for word in words if word in attack_words]
-        analysis["emotional_words"] = [word for word in words if word in emotional_words]  
-        analysis["manipulation_patterns"] = [word for word in words if word in manipulation_words]
+        severity_points = 0
+        
+        # Pattern matching with scoring
+        for category, lang_patterns in patterns.items():
+            found_items = []
+            
+            for lang, terms in lang_patterns.items():
+                if lang == "patterns":
+                    continue
+                    
+                for term in terms:
+                    if term in residual_lower:
+                        found_items.append(term)
+                        severity_points += 2 if lang == "english" else 3  # Non-English gets higher score
+            
+            # Pattern matching for complex phrases
+            if "patterns" in lang_patterns:
+                for pattern in lang_patterns["patterns"]:
+                    if pattern in residual_lower:
+                        found_items.append(pattern)
+                        severity_points += 3
+            
+            analysis[category] = found_items
+        
+        # Calculate severity and sophistication
+        analysis["severity_score"] = min(1.0, severity_points / 20)
+        
+        if severity_points > 15:
+            analysis["manipulation_sophistication"] = "high"
+        elif severity_points > 8:
+            analysis["manipulation_sophistication"] = "medium"
+        else:
+            analysis["manipulation_sophistication"] = "low"
+        
+        # Determine primary tactic
+        max_category = max(patterns.keys(), key=lambda k: len(analysis[k]))
+        if analysis[max_category]:
+            analysis["primary_tactic"] = max_category
+        
+        # Cultural context hints
+        korean_detected = any(term in residual_lower for term in patterns["personal_attacks"]["korean"] + patterns["emotional_manipulation"]["korean"] + patterns["social_manipulation"]["korean"])
+        spanish_detected = any(term in residual_lower for term in patterns["personal_attacks"]["spanish"] + patterns["emotional_manipulation"]["spanish"])
+        
+        if korean_detected:
+            analysis["cultural_context"] = "Korean language patterns detected - indirect confrontation style"
+        elif spanish_detected:
+            analysis["cultural_context"] = "Spanish language patterns detected - emotional emphasis style"
+        else:
+            analysis["cultural_context"] = "Western direct confrontation patterns"
         
         return analysis
+    
+    def _validate_and_merge_analysis(self, llm_result: Dict, pattern_result: Dict, residual: str) -> Dict[str, Any]:
+        """Cross-validate LLM and pattern analysis, merge results."""
+        
+        merged = {
+            "personal_attacks": list(set(llm_result.get("personal_attacks", []) + pattern_result.get("personal_attacks", []))),
+            "emotional_manipulation": list(set(llm_result.get("emotional_manipulation", []) + pattern_result.get("emotional_manipulation", []))),
+            "gaslighting_patterns": llm_result.get("gaslighting_patterns", []),
+            "social_manipulation": llm_result.get("social_manipulation", []),
+            "control_tactics": llm_result.get("control_tactics", []),
+            "cultural_context": llm_result.get("cultural_context", pattern_result.get("cultural_context", "")),
+            "primary_tactic": llm_result.get("primary_tactic", pattern_result.get("primary_tactic")),
+            "manipulation_sophistication": llm_result.get("manipulation_sophistication", pattern_result.get("manipulation_sophistication")),
+            "residual_content": residual,
+            "residual_word_count": len(residual.split()),
+            
+            # Hybrid scoring (weighted average)
+            "severity_score": (llm_result.get("severity_score", 0) * 0.7 + pattern_result.get("severity_score", 0) * 0.3),
+            "confidence": (llm_result.get("confidence", 0) * 0.8 + pattern_result.get("confidence", 0) * 0.2),
+            
+            # Cross-validation metrics
+            "llm_pattern_agreement": self._calculate_agreement(llm_result, pattern_result),
+            "validation_flags": self._generate_validation_flags(llm_result, pattern_result)
+        }
+        
+        return merged
+    
+    def _calculate_agreement(self, llm_result: Dict, pattern_result: Dict) -> float:
+        """Calculate agreement score between LLM and pattern analysis."""
+        agreements = 0
+        total_checks = 0
+        
+        # Compare severity scores
+        llm_severity = llm_result.get("severity_score", 0)
+        pattern_severity = pattern_result.get("severity_score", 0)
+        severity_agreement = 1.0 - abs(llm_severity - pattern_severity)
+        agreements += severity_agreement
+        total_checks += 1
+        
+        # Compare primary tactics
+        if llm_result.get("primary_tactic") == pattern_result.get("primary_tactic"):
+            agreements += 1
+        total_checks += 1
+        
+        # Compare attack detection overlap
+        llm_attacks = set(llm_result.get("personal_attacks", []))
+        pattern_attacks = set(pattern_result.get("personal_attacks", []))
+        if llm_attacks or pattern_attacks:
+            overlap = len(llm_attacks & pattern_attacks)
+            total_unique = len(llm_attacks | pattern_attacks)
+            attack_agreement = overlap / total_unique if total_unique > 0 else 1.0
+            agreements += attack_agreement
+            total_checks += 1
+        
+        return agreements / total_checks if total_checks > 0 else 1.0
+    
+    def _generate_validation_flags(self, llm_result: Dict, pattern_result: Dict) -> List[str]:
+        """Generate flags for validation discrepancies."""
+        flags = []
+        
+        # Severity mismatch
+        llm_severity = llm_result.get("severity_score", 0)
+        pattern_severity = pattern_result.get("severity_score", 0)
+        if abs(llm_severity - pattern_severity) > 0.3:
+            flags.append("severity_mismatch")
+        
+        # Primary tactic disagreement
+        if llm_result.get("primary_tactic") != pattern_result.get("primary_tactic"):
+            flags.append("tactic_disagreement")
+        
+        # High confidence with low agreement
+        agreement = self._calculate_agreement(llm_result, pattern_result)
+        if llm_result.get("confidence", 0) > 0.8 and agreement < 0.6:
+            flags.append("high_confidence_low_agreement")
+        
+        return flags
         
     def _analyze_implicit_messages(self) -> Dict[str, List[str]]:
-        """Analyze implicit/unspoken communication."""
-        # This would benefit from LLM analysis
-        # For now, simple pattern detection
+        """Analyze implicit/unspoken communication using LLM when available."""
+        
+        if self.llm_analyzer:
+            try:
+                return self._llm_analyze_implicit_messages()
+            except Exception as e:
+                # Fallback to pattern detection
+                return self._pattern_analyze_implicit_messages(error=str(e))
+        else:
+            return self._pattern_analyze_implicit_messages()
+    
+    def _llm_analyze_implicit_messages(self) -> Dict[str, List[str]]:
+        """Use LLM to detect sophisticated implicit communication patterns."""
+        
+        prompt = f"""
+        Analyze this email for implicit/unspoken messages and subtle communication patterns.
+        
+        EMAIL CONTENT:
+        {self.current_email_content}
+        
+        SENDER: {self.current_sender}
+        
+        Look for these IMPLICIT patterns (things not directly stated):
+        
+        1. IMPLICIT THREATS: Veiled threats, consequences implied but not stated
+        2. POWER DYNAMICS: Attempts to establish dominance or control
+        3. EMOTIONAL MANIPULATION: Subtle guilt, shame, or fear induction
+        4. SOCIAL PRESSURE: Implied social consequences, reputation threats
+        
+        Focus on SUBTEXT and IMPLICATIONS, not direct statements.
+        
+        Respond in JSON format:
+        {{
+            "threats": ["list of implicit threats found"],
+            "power_plays": ["dominance or control tactics"],
+            "emotional_hooks": ["subtle emotional manipulation"],
+            "social_weapons": ["social pressure or reputation threats"],
+            "confidence": 0.0-1.0,
+            "reasoning": "brief explanation of detected patterns"
+        }}
+        
+        If no implicit patterns found, return empty arrays.
+        """
+        
+        if hasattr(self.llm_analyzer, 'provider'):
+            # Real LLM providers
+            if self.llm_analyzer.provider == "anthropic":
+                response = self.llm_analyzer.client.messages.create(
+                    model=self.llm_analyzer.model_name,
+                    max_tokens=300,
+                    temperature=0.1,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                result = response.content[0].text.strip()
+                
+            elif self.llm_analyzer.provider == "openai":
+                response = self.llm_analyzer.client.chat.completions.create(
+                    model=self.llm_analyzer.model_name,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=300,
+                    temperature=0.1
+                )
+                result = response.choices[0].message.content.strip()
+            else:
+                raise ValueError(f"Unsupported provider: {self.llm_analyzer.provider}")
+        else:
+            # Simple mock - static response for pipeline testing
+            result = """{
+                "threats": ["mock implicit threat"],
+                "power_plays": [],
+                "emotional_hooks": ["mock emotional hook"],
+                "social_weapons": [],
+                "confidence": 0.6,
+                "reasoning": "Mock analysis for pipeline testing"
+            }"""
+        
+        import json
+        llm_result = json.loads(result)
+        
+        # Convert to expected format
+        return {
+            "threats": llm_result.get("threats", []),
+            "power_plays": llm_result.get("power_plays", []),
+            "emotional_hooks": llm_result.get("emotional_hooks", []),
+            "social_weapons": llm_result.get("social_weapons", []),
+            "analysis_method": "llm_enhanced",
+            "confidence": llm_result.get("confidence", 0.7),
+            "reasoning": llm_result.get("reasoning", "")
+        }
+    
+    def _pattern_analyze_implicit_messages(self, error: str = None) -> Dict[str, List[str]]:
+        """Fallback pattern-based implicit message detection."""
         
         implicit = {
             "threats": [],
             "power_plays": [],
             "emotional_hooks": [],
-            "social_weapons": []
+            "social_weapons": [],
+            "analysis_method": "pattern_fallback",
+            "confidence": 0.5
         }
+        
+        if error:
+            implicit["fallback_reason"] = f"LLM analysis failed: {error}"
         
         content_lower = self.current_email_content.lower()
         
-        # Threat patterns
-        if any(phrase in content_lower for phrase in ["or else", "if you don't", "you'll regret"]):
-            implicit["threats"].append("conditional_threat")
-            
+        # Implicit threat patterns
+        threat_patterns = ["or else", "if you don't", "you'll regret", "consequences", "last chance"]
+        for pattern in threat_patterns:
+            if pattern in content_lower:
+                implicit["threats"].append("conditional_threat")
+                break
+                
+        # Power play patterns  
+        power_patterns = ["you have to", "you must", "no choice", "demand", "require"]
+        for pattern in power_patterns:
+            if pattern in content_lower:
+                implicit["power_plays"].append("authority_assertion")
+                break
+        
+        # Emotional manipulation patterns
+        emotion_patterns = ["disappointed", "expected better", "thought you were", "after everything"]
+        for pattern in emotion_patterns:
+            if pattern in content_lower:
+                implicit["emotional_hooks"].append("guilt_induction")
+                break
+                
         # Social pressure patterns  
-        if any(phrase in content_lower for phrase in ["everyone knows", "people are saying", "others think"]):
-            implicit["social_weapons"].append("false_consensus")
-            
+        social_patterns = ["everyone knows", "people are saying", "others think", "tell everyone"]
+        for pattern in social_patterns:
+            if pattern in content_lower:
+                implicit["social_weapons"].append("false_consensus")
+                break
+        
         return implicit
         
     def _detect_escalation_pattern(self) -> bool:
