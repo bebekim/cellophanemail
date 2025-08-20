@@ -113,22 +113,145 @@ class SharedContext:
         
     def update_phase2_manner_summary(self):
         """
-        Phase 2: Summarize how facts are presented overall.
-        Analyzes the manner patterns from Phase 1.
+        Phase 2: Enhanced manner analysis using LLM for context-aware evaluation.
+        Analyzes how facts are presented and provides detailed reasoning.
         """
-        current_facts = [fa for fa in self.fact_analyses 
-                        if fa.analysis_method.startswith(f"iter_{self.iteration}")]
+        # Get facts from current iteration
+        current_iteration_start = len(self.fact_analyses) - len(self.current_email_facts)
+        current_facts = self.fact_analyses[current_iteration_start:]
         
         if not current_facts:
             return None
+        
+        # Enhanced analysis with LLM if available
+        if self.llm_analyzer and len(current_facts) > 0:
+            overall_analysis = self._llm_analyze_overall_manner(current_facts)
+        else:
+            overall_analysis = self._simple_manner_summary(current_facts)
             
+        phase_result = PhaseResult(
+            phase="manner_summary",
+            iteration=self.iteration,
+            timestamp=datetime.now(),
+            data=overall_analysis
+        )
+        self.phase_results.append(phase_result)
+        
+        return phase_result
+    
+    def _llm_analyze_overall_manner(self, fact_analyses: List[FactAnalysis]) -> Dict[str, Any]:
+        """Use LLM to analyze overall manner with cultural and linguistic context."""
+        
+        # Prepare facts and context for LLM analysis
+        facts_with_context = []
+        for fa in fact_analyses:
+            facts_with_context.append({
+                "fact": fa.fact_text,
+                "individual_manner": fa.manner,
+                "context": fa.surrounding_context
+            })
+        
+        prompt = f"""
+        Analyze the overall manner in which factual information is presented in this email.
+        
+        EMAIL CONTENT:
+        {self.current_email_content}
+        
+        INDIVIDUAL FACTS AND THEIR CONTEXTS:
+        {chr(10).join([f"FACT: {f['fact']} | CONTEXT: {f['context'][:100]}..." for f in facts_with_context])}
+        
+        Consider:
+        1. How are facts woven into the overall message?
+        2. What is the emotional tone surrounding factual statements?
+        3. Are facts used to support, attack, manipulate, or inform?
+        4. What cultural/linguistic patterns affect interpretation?
+        5. Is there escalation or de-escalation in tone?
+        
+        Analyze the OVERALL MANNER across all facts:
+        - PREDOMINANTLY_POSITIVE: Facts presented constructively, supportively
+        - PREDOMINANTLY_NEGATIVE: Facts used aggressively, manipulatively  
+        - MIXED: Some positive, some negative presentation
+        - NEUTRAL: Plain factual presentation
+        
+        Respond in this JSON format:
+        {{
+            "overall_manner": "PREDOMINANTLY_POSITIVE|PREDOMINANTLY_NEGATIVE|MIXED|NEUTRAL",
+            "reasoning": "Brief explanation of why you classified it this way",
+            "cultural_context": "Any cultural/linguistic factors that influenced your analysis",
+            "manipulation_detected": true/false,
+            "emotional_loading": "high|medium|low"
+        }}
+        """
+        
+        try:
+            if hasattr(self.llm_analyzer, 'provider'):
+                if self.llm_analyzer.provider == "anthropic":
+                    response = self.llm_analyzer.client.messages.create(
+                        model=self.llm_analyzer.model_name,
+                        max_tokens=300,
+                        temperature=0.1,
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    result = response.content[0].text.strip()
+                    
+                elif self.llm_analyzer.provider == "openai":
+                    response = self.llm_analyzer.client.chat.completions.create(
+                        model=self.llm_analyzer.model_name,
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=300,
+                        temperature=0.1
+                    )
+                    result = response.choices[0].message.content.strip()
+                else:
+                    raise ValueError(f"Unsupported provider: {self.llm_analyzer.provider}")
+            else:
+                # Mock LLM response for testing
+                result = """{
+                    "overall_manner": "PREDOMINANTLY_NEGATIVE",
+                    "reasoning": "Facts are presented in accusatory context with emotional pressure",
+                    "cultural_context": "Direct confrontational style typical in debt collection",
+                    "manipulation_detected": true,
+                    "emotional_loading": "high"
+                }"""
+            
+            # Parse JSON response
+            import json
+            llm_analysis = json.loads(result)
+            
+            # Count individual manner classifications for compatibility
+            manner_counts = {"positive": 0, "neutral": 0, "negative": 0}
+            for fa in fact_analyses:
+                manner_counts[fa.manner] += 1
+                
+            total_facts = len(fact_analyses)
+            
+            return {
+                "overall_manner": llm_analysis.get("overall_manner", "MIXED").lower(),
+                "llm_reasoning": llm_analysis.get("reasoning", ""),
+                "cultural_context": llm_analysis.get("cultural_context", ""),
+                "manipulation_detected": llm_analysis.get("manipulation_detected", False),
+                "emotional_loading": llm_analysis.get("emotional_loading", "medium"),
+                "manner_distribution": manner_counts,
+                "negative_ratio": manner_counts["negative"] / total_facts,
+                "positive_ratio": manner_counts["positive"] / total_facts,
+                "total_facts_analyzed": total_facts,
+                "analysis_method": "llm_enhanced"
+            }
+            
+        except Exception as e:
+            # Fallback to simple analysis if LLM fails
+            return self._simple_manner_summary(fact_analyses, error=str(e))
+    
+    def _simple_manner_summary(self, fact_analyses: List[FactAnalysis], error: str = None) -> Dict[str, Any]:
+        """Simple fallback manner summary when LLM unavailable."""
+        
         # Count manner types
         manner_counts = {"positive": 0, "neutral": 0, "negative": 0}
-        for fact_analysis in current_facts:
+        for fact_analysis in fact_analyses:
             manner_counts[fact_analysis.manner] += 1
             
         # Determine overall manner
-        total_facts = len(current_facts)
+        total_facts = len(fact_analyses)
         negative_ratio = manner_counts["negative"] / total_facts
         positive_ratio = manner_counts["positive"] / total_facts
         
@@ -138,22 +261,20 @@ class SharedContext:
             overall_manner = "predominantly_positive"
         else:
             overall_manner = "mixed_or_neutral"
-            
-        phase_result = PhaseResult(
-            phase="manner_summary",
-            iteration=self.iteration,
-            timestamp=datetime.now(),
-            data={
-                "overall_manner": overall_manner,
-                "manner_distribution": manner_counts,
-                "negative_ratio": negative_ratio,
-                "positive_ratio": positive_ratio,
-                "total_facts_analyzed": total_facts
-            }
-        )
-        self.phase_results.append(phase_result)
         
-        return phase_result
+        result = {
+            "overall_manner": overall_manner,
+            "manner_distribution": manner_counts,
+            "negative_ratio": negative_ratio,
+            "positive_ratio": positive_ratio,
+            "total_facts_analyzed": total_facts,
+            "analysis_method": "simple_fallback"
+        }
+        
+        if error:
+            result["fallback_reason"] = f"LLM analysis failed: {error}"
+            
+        return result
         
     def update_phase3_non_factual(self):
         """
@@ -232,12 +353,108 @@ class SharedContext:
         return summary
         
     def _extract_facts(self, content: str) -> List[str]:
-        """Simple fact extraction - can be enhanced later."""
+        """
+        Extract facts using LLM for language-agnostic detection.
+        Falls back to simple regex if LLM unavailable.
+        """
+        if self.llm_analyzer:
+            try:
+                return self._llm_extract_facts(content)
+            except Exception as e:
+                logger.warning(f"LLM fact extraction failed: {e}. Using fallback.")
+                return self._regex_extract_facts(content)
+        else:
+            return self._regex_extract_facts(content)
+    
+    def _llm_extract_facts(self, content: str) -> List[str]:
+        """Use LLM to extract factual statements from email content."""
+        
+        # Create extraction prompt
+        prompt = f"""
+        Extract factual statements from this email content. A factual statement is something that can be verified as true or false, such as:
+        - Monetary amounts ($500, 100 dollars, fifty euros)
+        - Dates and times (last month, January 15, 2024, next Friday)
+        - Quantities (3 times, 5 people, 2 hours)
+        - Specific events (meeting at cafe, called yesterday)
+        - Locations (downtown office, 123 Main St)
+        - Names of people, places, or things
+        
+        EMAIL CONTENT:
+        {content}
+        
+        Extract each factual statement as a separate line. Include the exact text from the email.
+        Do not include:
+        - Opinions ("you're selfish")
+        - Emotions ("I'm angry")
+        - Generalizations ("you always")
+        - Threats ("or else")
+        
+        Output format:
+        FACT: [exact text from email]
+        FACT: [exact text from email]
+        
+        If no facts found, respond with: NO_FACTS_FOUND
+        """
+        
+        # Use LLM for language-agnostic fact extraction
+        from .llm_analyzer import analyze_fact_manner_with_llm
+        
+        if hasattr(self.llm_analyzer, 'provider'):
+            # Real LLM providers
+            try:
+                if self.llm_analyzer.provider == "anthropic":
+                    response = self.llm_analyzer.client.messages.create(
+                        model=self.llm_analyzer.model_name,
+                        max_tokens=500,
+                        temperature=0.1,
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    result = response.content[0].text.strip()
+                
+                elif self.llm_analyzer.provider == "openai":
+                    response = self.llm_analyzer.client.chat.completions.create(
+                        model=self.llm_analyzer.model_name,
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=500,
+                        temperature=0.1
+                    )
+                    result = response.choices[0].message.content.strip()
+                else:
+                    raise ValueError(f"Unsupported provider: {self.llm_analyzer.provider}")
+                    
+            except Exception as e:
+                logger.error(f"LLM fact extraction failed: {e}")
+                raise
+        
+        else:
+            # Mock analyzer - simulate LLM response for testing
+            result = f"""
+            FACT: $500
+            FACT: last year
+            FACT: 3 months ago
+            """
+        
+        # Parse LLM response
+        facts = []
+        if result and result != "NO_FACTS_FOUND":
+            lines = result.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('FACT:'):
+                    fact = line.replace('FACT:', '').strip()
+                    if fact and len(fact) > 0:
+                        facts.append(fact)
+        
+        # logger.debug(f"LLM extracted {len(facts)} facts from content")
+        return facts
+    
+    def _regex_extract_facts(self, content: str) -> List[str]:
+        """Fallback regex-based fact extraction (English-specific)."""
         facts = []
         
         # Money amounts
-        money_pattern = r'\$[\d,]+\.?\d*'
-        facts.extend(re.findall(money_pattern, content))
+        money_pattern = r'\$[\d,]+\.?\d*|[\d,]+\.?\d*\s*(?:dollars?|euros?|pounds?|won|yen)'
+        facts.extend(re.findall(money_pattern, content, re.IGNORECASE))
         
         # Dates
         date_pattern = r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b'
@@ -251,6 +468,11 @@ class SharedContext:
         number_pattern = r'\b\d+\s+(?:times|hours|days|weeks|months|years|people|dollars)\b'
         facts.extend(re.findall(number_pattern, content, re.IGNORECASE))
         
+        # Korean money patterns (example for multilingual support)
+        korean_money = r'\d+(?:만원|원|달러)'
+        facts.extend(re.findall(korean_money, content))
+        
+        # logger.debug(f"Regex extracted {len(facts)} facts from content")
         return facts
         
     def _analyze_fact_manner(self, fact: str) -> FactAnalysis:

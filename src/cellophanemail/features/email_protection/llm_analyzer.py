@@ -155,7 +155,7 @@ class MockLLMAnalyzer:
         self.call_history = []
         
     def analyze_fact_manner(self, fact_text: str, full_email_content: str, sender_email: str) -> str:
-        """Mock analysis for testing."""
+        """Mock manner analysis - just returns configured response for testing."""
         self.call_count += 1
         self.call_history.append({
             "fact": fact_text,
@@ -163,10 +163,5 @@ class MockLLMAnalyzer:
             "sender": sender_email
         })
         
-        # Simple mock logic
-        if "stupid" in full_email_content.lower() or "$" in fact_text:
-            return "negative"
-        elif "thank" in full_email_content.lower():
-            return "positive"
-        else:
-            return self.default_response
+        # Just return the configured response - real LLM would understand any language
+        return self.default_response
