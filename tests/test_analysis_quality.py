@@ -45,8 +45,13 @@ class AnalysisQualityTest:
         print(f"Samples: {len(ALL_SAMPLES)} total")
         print()
         
-        # For testing, limit to first 3 samples to avoid hitting API limits
-        test_samples = ALL_SAMPLES[:3] if os.getenv('QUICK_TEST') else ALL_SAMPLES
+        # For pytest runs, use only 1 sample to prevent running all emails
+        # Set FULL_ANALYSIS=true to run all samples for comprehensive testing
+        if os.getenv('FULL_ANALYSIS', '').lower() in ['true', '1', 'yes']:
+            test_samples = ALL_SAMPLES
+        else:
+            # Default: use only first sample for fast pytest runs
+            test_samples = ALL_SAMPLES[:1]
         
         # Analyze each sample
         for i, sample in enumerate(test_samples, 1):

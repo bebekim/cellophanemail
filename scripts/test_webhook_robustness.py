@@ -6,7 +6,7 @@ import aiohttp
 import json
 import sys
 
-async def test_webhook_endpoint(base_url: str = "http://localhost:8000"):
+async def webhook_robustness_test(base_url: str = "http://localhost:8000"):
     """Test webhook endpoints with various payloads."""
     
     test_cases = [
@@ -106,4 +106,4 @@ async def test_webhook_endpoint(base_url: str = "http://localhost:8000"):
 
 if __name__ == "__main__":
     base_url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
-    asyncio.run(test_webhook_endpoint(base_url))
+    asyncio.run(webhook_robustness_test(base_url))
