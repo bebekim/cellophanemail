@@ -7,9 +7,10 @@ import pytest
 from cellophanemail.config.pricing import (
     STARTER_PRICE,
     STARTER_EMAILS,
+    PLUS_PRICE,
+    PLUS_EMAILS,
     PROFESSIONAL_PRICE,
     PROFESSIONAL_EMAILS,
-    UNLIMITED_PRICE,
     ADDON_PACK_PRICE,
     ADDON_PACK_EMAILS,
     TRIAL_PERIOD_DAYS,

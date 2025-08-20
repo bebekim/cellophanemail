@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-from cellophanemail.core.email_processor import EmailProcessor
+from cellophanemail.features.email_protection.processor import EmailProtectionProcessor
 from cellophanemail.core.email_message import EmailMessage
 from cellophanemail.config.settings import Settings
 
@@ -78,7 +78,7 @@ class TestCompleteEmailFlow:
             mock_content_processor.return_value = mock_result
             
             # Create email processor with SMTP config
-            processor = EmailProcessor(smtp_config)
+            processor = EmailProtectionProcessor()
             
             # Process the email
             result = await processor.process(sample_email_message)
@@ -116,7 +116,7 @@ class TestCompleteEmailFlow:
             mock_content_processor.return_value = mock_result
             
             # Create email processor with Postmark config
-            processor = EmailProcessor(postmark_config)
+            processor = EmailProtectionProcessor()
             
             # Process the email
             result = await processor.process(sample_email_message)
@@ -149,7 +149,7 @@ class TestCompleteEmailFlow:
             mock_content_processor.return_value = mock_result
             
             # Create email processor with SMTP config
-            processor = EmailProcessor(smtp_config)
+            processor = EmailProtectionProcessor()
             
             # Update sample email to be harmful
             sample_email_message.from_address = 'abusiveparent@gmail.com'
@@ -187,7 +187,7 @@ class TestCompleteEmailFlow:
             mock_content_processor.return_value = mock_result
             
             # Create email processor with NO config (no email sender)
-            processor = EmailProcessor()
+            processor = EmailProtectionProcessor()
             
             # Process the email
             result = await processor.process(sample_email_message)

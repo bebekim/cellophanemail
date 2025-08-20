@@ -6,8 +6,8 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 import statistics
 
-from .metrics_collector import TestRunMetrics, MetricsCollector
-from .analysis_comparator import AnalysisComparator, ComparisonType
+from .metrics_collector import MetricsCollector, TestRunMetrics
+from .analysis_comparator import AnalysisComparator
 from .pipeline_tracer import PipelineTrace
 from .test_samples import EmailTestSample, ToxicityLevel
 

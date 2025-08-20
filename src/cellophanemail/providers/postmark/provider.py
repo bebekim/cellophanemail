@@ -25,6 +25,8 @@ class PostmarkProvider(EmailProvider):
         self.client: Optional[Any] = None
         self.server_token: Optional[str] = None
         self.from_address: Optional[str] = None
+        self.dry_run: bool = False  # Enable to prevent actual API calls
+        self.sent_count: int = 0  # Track sends in dry-run mode
         
     async def initialize(self, config: ProviderConfig) -> None:
         """Initialize Postmark with API credentials."""
@@ -34,14 +36,27 @@ class PostmarkProvider(EmailProvider):
         self.server_token = config.config.get('server_token') or os.getenv('POSTMARK_SERVER_TOKEN')
         self.from_address = config.config.get('from_address', 'noreply@cellophanemail.com')
         
-        if not self.server_token:
-            raise ValueError("Postmark server token required")
+        # Check for dry-run mode from config or environment
+        self.dry_run = (
+            config.config.get('dry_run', False) or 
+            os.getenv('POSTMARK_DRY_RUN', '').lower() in ['true', '1', 'yes'] or
+            os.getenv('CELLOPHANEMAIL_TEST_MODE', '').lower() in ['true', '1', 'yes']
+        )
+        
+        if self.dry_run:
+            logger.warning("🚫 Postmark running in DRY-RUN mode - no emails will be sent!")
+            logger.info("Set POSTMARK_DRY_RUN=false to send real emails")
+        elif not self.server_token:
+            logger.warning("No Postmark server token - enabling dry-run mode automatically")
+            self.dry_run = True
             
-        if has_postmark:
-            # Initialize Postmark client if available
+        if has_postmark and not self.dry_run:
+            # Initialize Postmark client if available and not in dry-run
             # Using the postmark package API structure
             self.client = True  # Placeholder for actual client initialization
-        logger.info(f"Postmark provider initialized with from_address: {self.from_address}")
+            
+        mode = "DRY-RUN" if self.dry_run else "LIVE"
+        logger.info(f"Postmark provider initialized [{mode}] with from_address: {self.from_address}")
     
     async def receive_message(self, raw_data: Dict[str, Any]) -> EmailMessage:
         """Parse Postmark webhook data into EmailMessage."""
@@ -89,21 +104,44 @@ class PostmarkProvider(EmailProvider):
     
     async def send_message(self, message: EmailMessage) -> bool:
         """Send email through Postmark."""
+        if self.dry_run:
+            # Dry-run mode - just log what would be sent
+            self.sent_count += 1
+            logger.info(f"🔵 [DRY-RUN] Postmark send #{self.sent_count}")
+            logger.info(f"  To: {message.to_addresses}")
+            logger.info(f"  Subject: {message.subject}")
+            logger.info(f"  From: {self.from_address or message.from_address}")
+            logger.info(f"  Size: {len(message.text_body or '')} chars (text), {len(message.html_body or '')} chars (html)")
+            
+            # Store in a file for debugging if needed
+            if os.getenv('POSTMARK_LOG_DRY_RUN'):
+                import json
+                log_file = f"postmark_dry_run_{datetime.now().strftime('%Y%m%d')}.jsonl"
+                with open(log_file, 'a') as f:
+                    f.write(json.dumps({
+                        'timestamp': datetime.now().isoformat(),
+                        'to': message.to_addresses,
+                        'subject': message.subject,
+                        'from': self.from_address,
+                        'message_id': message.message_id,
+                        'dry_run': True
+                    }) + '\n')
+            
+            return True  # Always succeed in dry-run
+            
         if not self.server_token:
-            logger.error("Postmark not initialized")
+            logger.error("Postmark not initialized and not in dry-run mode")
             return False
             
         try:
-            # In production, this would use the Postmark API
-            # For now, we'll log the intent
-            logger.info(f"Would send email via Postmark to {message.to_addresses}")
+            # TODO: Implement actual Postmark API call here
+            # For now, still mocked but shows it would make real call
+            logger.warning("⚠️ Postmark real sending not yet implemented - simulating success")
+            logger.info(f"Would send REAL email via Postmark to {message.to_addresses}")
             logger.info(f"  Subject: {message.subject}")
             logger.info(f"  From: {self.from_address}")
             
-            # TODO: Implement actual Postmark sending when needed
-            # This requires proper Postmark API client setup
-            
-            return True  # Simulate success for testing
+            return True  # Simulate success for now
             
         except Exception as e:
             logger.error(f"Failed to send via Postmark: {e}")

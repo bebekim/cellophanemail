@@ -5,15 +5,17 @@ import asyncio
 from unittest.mock import Mock, patch
 
 from tests.four_horsemen import (
-    FourHorsemenTestSamples,
+    EmailTestSample,
     ToxicityLevel,
-    HorsemanType,
+    FourHorseman,
     PipelineTracer,
     MetricsCollector,
     AnalysisComparator,
-    ComparisonType,
-    TestReporter
+    ALL_SAMPLES,
+    get_samples_by_classification,
+    get_samples_by_horseman
 )
+from tests.four_horsemen.test_reporter import TestReporter
 
 
 class TestFourHorsemenSamples:
@@ -21,7 +23,7 @@ class TestFourHorsemenSamples:
     
     def test_get_all_samples(self):
         """Test that all samples are loaded correctly."""
-        samples = FourHorsemenTestSamples.get_all_samples()
+        samples = ALL_SAMPLES
         
         assert len(samples) > 0
         assert all(hasattr(sample, 'id') for sample in samples)
@@ -30,8 +32,8 @@ class TestFourHorsemenSamples:
     
     def test_get_samples_by_toxicity(self):
         """Test filtering samples by toxicity level."""
-        safe_samples = FourHorsemenTestSamples.get_samples_by_toxicity(ToxicityLevel.SAFE)
-        harmful_samples = FourHorsemenTestSamples.get_samples_by_toxicity(ToxicityLevel.HARMFUL)
+        safe_samples = get_samples_by_classification(ToxicityLevel.SAFE)
+        harmful_samples = get_samples_by_classification(ToxicityLevel.HARMFUL)
         
         assert len(safe_samples) > 0
         assert len(harmful_samples) > 0
@@ -40,8 +42,8 @@ class TestFourHorsemenSamples:
     
     def test_get_samples_with_horseman(self):
         """Test filtering samples by Four Horsemen type."""
-        criticism_samples = FourHorsemenTestSamples.get_samples_with_horseman(HorsemanType.CRITICISM)
-        contempt_samples = FourHorsemenTestSamples.get_samples_with_horseman(HorsemanType.CONTEMPT)
+        criticism_samples = get_samples_by_horseman(FourHorseman.CRITICISM)
+        contempt_samples = get_samples_by_horseman(FourHorseman.CONTEMPT)
         
         # Should have samples with these patterns
         assert len(criticism_samples) > 0
@@ -122,7 +124,7 @@ class TestAnalysisComparator:
         comparator = AnalysisComparator()
         
         # Create a test sample
-        sample = FourHorsemenTestSamples.get_safe_samples()[0]
+        sample = get_samples_by_classification(ToxicityLevel.SAFE)[0]
         
         # Mock analysis results
         analysis_a = {

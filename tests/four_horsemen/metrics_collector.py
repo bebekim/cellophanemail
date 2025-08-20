@@ -82,6 +82,21 @@ class TestResult:
     error: Optional[str] = None
 
 
+@dataclass
+class TestRunMetrics:
+    """Comprehensive metrics for a complete test run."""
+    classification_metrics: ClassificationMetrics
+    horsemen_metrics: HorsemenMetrics  
+    performance_metrics: PerformanceMetrics
+    cost_metrics: CostMetrics
+    language_metrics: LanguageMetrics
+    test_results: List[TestResult]
+    total_samples: int
+    successful_tests: int
+    failed_tests: int
+    test_duration_seconds: float
+
+
 class MetricsCollector:
     """Collector for Four Horsemen analysis quality metrics."""
     

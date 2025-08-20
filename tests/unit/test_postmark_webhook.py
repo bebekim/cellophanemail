@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../src'))
 
 from cellophanemail.routes.webhooks import WebhookController
 from cellophanemail.models.user import User
-from cellophanemail.core.email_processor import ProcessingResult
+from cellophanemail.features.email_protection.models import ProtectionResult
 
 
 class TestPostmarkWebhookHandlerFixed:
@@ -44,7 +44,7 @@ class TestPostmarkWebhookHandlerFixed:
             "is_active": True
         }
         
-        mock_result = ProcessingResult(
+        mock_result = ProtectionResult(
             email_id="test-id",
             should_forward=True,
             toxicity_score=0.1,
@@ -84,7 +84,7 @@ class TestPostmarkWebhookHandlerFixed:
             "is_active": True
         }
         
-        mock_result = ProcessingResult(
+        mock_result = ProtectionResult(
             email_id="test-id",
             should_forward=False,
             block_reason="Four Horsemen detected",
