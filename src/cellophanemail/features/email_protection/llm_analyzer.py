@@ -85,15 +85,41 @@ def analyze_fact_manner_with_llm(
 class SimpleLLMAnalyzer:
     """Simple wrapper for LLM analysis with configurable provider and model."""
     
-    def __init__(self, provider: str, client, model_name: str):
+    def __init__(self, provider: str = None, client = None, model_name: str = None):
         """
         Initialize LLM analyzer.
         
         Args:
-            provider: LLM provider name ("anthropic", "openai")
-            client: Configured client for the provider
-            model_name: Specific model to use
+            provider: LLM provider name ("anthropic", "openai"). Defaults to "anthropic"
+            client: Configured client for the provider. Auto-created from env if None
+            model_name: Specific model to use. Defaults to claude-3-5-sonnet-20241022
         """
+        # Use defaults if not provided
+        if provider is None:
+            provider = "anthropic"
+        
+        if client is None or model_name is None:
+            import os
+            from dotenv import load_dotenv
+            load_dotenv()  # Load environment variables from .env file
+            
+            if provider == "anthropic":
+                api_key = os.getenv("ANTHROPIC_API_KEY")
+                if api_key:
+                    import anthropic
+                    client = anthropic.Anthropic(api_key=api_key)
+                    model_name = model_name or "claude-3-5-sonnet-20241022"
+                else:
+                    raise ValueError("ANTHROPIC_API_KEY not found in environment")
+            elif provider == "openai":
+                api_key = os.getenv("OPENAI_API_KEY")
+                if api_key:
+                    import openai
+                    client = openai.OpenAI(api_key=api_key)
+                    model_name = model_name or "gpt-4"
+                else:
+                    raise ValueError("OPENAI_API_KEY not found in environment")
+        
         self.provider = provider
         self.client = client
         self.model_name = model_name
