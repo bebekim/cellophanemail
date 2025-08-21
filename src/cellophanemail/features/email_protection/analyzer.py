@@ -14,11 +14,14 @@ logger = logging.getLogger(__name__)
 
 class FourHorsemenAnalyzer:
     """
-    Analyzes email content for the Four Horsemen of harmful communication:
-    - Harassment: Direct attacks, threats, bullying
-    - Deception: Phishing, scams, false information
-    - Exploitation: Taking advantage, coercion, manipulation for gain
-    - Manipulation: Emotional manipulation, gaslighting, control tactics
+    Enhanced analyzer for the Four Horsemen of relationship destruction.
+    Now integrates shared context from all 4 phases for sophisticated detection.
+    
+    Progressive hierarchy (Gottman's research):
+    1. Criticism - Attacks on character (Level 1)
+    2. Contempt - Mockery, disgust, superiority (Level 2) 
+    3. Defensiveness - Blame deflection, playing victim (Level 3)
+    4. Stonewalling - Complete withdrawal (Level 4 - requires longitudinal)
     """
     
     def __init__(self):
@@ -27,28 +30,27 @@ class FourHorsemenAnalyzer:
         self._cache: Dict[str, AnalysisResult] = {}
         self._cache_ttl = timedelta(minutes=15)
         
-        # Threat indicators for each horseman
+        # Progressive Four Horsemen indicators (Level 1-3)
         self.horseman_indicators = {
-            "harassment": {
-                "keywords": ["hate", "stupid", "idiot", "kill", "die", "threat", "loser", "worthless"],
-                "patterns": ["you're.*stupid", "kill yourself", "nobody likes you", "you should die"],
-                "weight": 1.0
+            "criticism": {  # Level 1 - Character attacks
+                "phase_sources": ["fact_manner", "non_factual"],
+                "indicators": ["personal_attacks", "character_assassination"],
+                "weight": 0.7,
+                "level": 1
             },
-            "deception": {
-                "keywords": ["prize", "winner", "claim", "verify account", "suspended", "urgent", "act now"],
-                "patterns": ["click.*link", "verify.*account", "claim.*prize", "suspended.*account"],
-                "weight": 0.9
+            "contempt": {  # Level 2 - Mockery, disgust, superiority
+                "phase_sources": ["manner_summary", "non_factual"],
+                "indicators": ["mockery", "sarcasm", "disgust", "name_calling"],
+                "weight": 0.85,
+                "level": 2
             },
-            "exploitation": {
-                "keywords": ["send money", "wire transfer", "bitcoin", "investment opportunity", "get rich"],
-                "patterns": ["send.*money", "transfer.*funds", "amazing.*opportunity"],
-                "weight": 0.95
+            "defensiveness": {  # Level 3 - Blame deflection, victim playing
+                "phase_sources": ["implicit_analysis", "non_factual"],
+                "indicators": ["blame_shifting", "victim_playing", "deflection"],
+                "weight": 0.95,
+                "level": 3
             },
-            "manipulation": {
-                "keywords": ["you always", "you never", "if you loved me", "everyone thinks", "gaslight"],
-                "patterns": ["you always.*", "you never.*", "if you.*loved", "everyone knows"],
-                "weight": 0.85
-            }
+            # Stonewalling (Level 4) reserved for longitudinal analysis
         }
     
     def _get_cache_key(self, content: str, sender: str) -> str:
@@ -66,7 +68,7 @@ class FourHorsemenAnalyzer:
             return result
         return None
     
-    def analyze(self, content: str, sender: str = "") -> AnalysisResult:
+    def analyze(self, content: str, sender: str = "", shared_context: Optional[Any] = None) -> AnalysisResult:
         """
         Analyze email content for harmful patterns.
         
