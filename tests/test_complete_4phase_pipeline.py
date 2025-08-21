@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from cellophanemail.features.email_protection.processor import EmailProtectionProcessor
-from cellophanemail.features.email_protection.llm_analyzer import MockLLMAnalyzer
+from cellophanemail.features.email_protection.llm_analyzer import SimpleLLMAnalyzer
 from cellophanemail.providers.contracts import EmailMessage
 
 
@@ -27,7 +27,7 @@ async def test_complete_4phase_pipeline():
     print()
     
     # Create processor with LLM
-    processor = EmailProtectionProcessor(MockLLMAnalyzer("neutral"))
+    processor = EmailProtectionProcessor(SimpleLLMAnalyzer("neutral"))
     
     test_email = EmailMessage(
         message_id="test-complete-001",

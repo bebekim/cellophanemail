@@ -12,7 +12,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from cellophanemail.features.email_protection.processor import EmailProtectionProcessor
-from cellophanemail.features.email_protection.llm_analyzer import MockLLMAnalyzer
+from cellophanemail.features.email_protection.llm_analyzer import SimpleLLMAnalyzer
 from cellophanemail.providers.contracts import EmailMessage
 
 
@@ -21,8 +21,8 @@ class TestMultilingualFactExtraction:
     
     def setup_method(self):
         """Set up test environment with mock LLM."""
-        self.mock_llm = MockLLMAnalyzer(default_response="neutral")
-        self.processor = EmailProtectionProcessor(llm_analyzer=self.mock_llm)
+        self.real_llm = SimpleLLMAnalyzer(default_response="neutral")
+        self.processor = EmailProtectionProcessor(llm_analyzer=self.real_llm)
     
     @pytest.mark.asyncio
     async def test_english_fact_extraction(self):

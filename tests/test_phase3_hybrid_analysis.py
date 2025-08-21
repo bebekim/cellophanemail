@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from cellophanemail.features.email_protection.processor import EmailProtectionProcessor
-from cellophanemail.features.email_protection.llm_analyzer import MockLLMAnalyzer
+from cellophanemail.features.email_protection.llm_analyzer import SimpleLLMAnalyzer
 from cellophanemail.providers.contracts import EmailMessage
 
 
@@ -127,7 +127,7 @@ async def test_hybrid_phase3_analysis():
         print(f"📧 Testing: {test_case['name']}")
         
         # Create processor with mock LLM
-        processor = EmailProtectionProcessor(MockLLMAnalyzer("neutral"))
+        processor = EmailProtectionProcessor(SimpleLLMAnalyzer("neutral"))
         
         # Process email
         result = await processor.process_email(test_case["email"], "real@example.com")
@@ -265,7 +265,7 @@ async def test_phase3_cross_validation():
     print("-" * 40)
     print()
     
-    processor = EmailProtectionProcessor(MockLLMAnalyzer("neutral"))
+    processor = EmailProtectionProcessor(SimpleLLMAnalyzer("neutral"))
     
     # Email with clear patterns that both LLM and regex should detect
     email = EmailMessage(
