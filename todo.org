@@ -68,6 +68,22 @@
    - ✅ Programmatic Configuration: API-based webhook switching
    - ✅ Local Development: Complete pipeline working via ngrok
 
+** DONE Remove problematic mock analyzer entirely
+   CLOSED: [2025-08-21]
+   - [X] Removed SmartMockLLMAnalyzer that used English-only patterns
+   - [X] Updated shared_context.py to require real LLM
+   - [X] Eliminated language-specific fallback patterns
+   - [X] System now properly language-agnostic using real Claude API
+
+** DONE Update all tests to use real LLMs
+   CLOSED: [2025-08-21] 
+   - [X] Converted MockLLMAnalyzer usage to SimpleLLMAnalyzer
+   - [X] Updated SimpleLLMAnalyzer to auto-load from .env
+   - [X] Created ad-hoc test runner for real LLM testing
+   - [X] Verified system works with actual Claude API calls
+   - [X] Tested with real-world corporate emails (Zuckerberg samples)
+   - [X] Demonstrated sophisticated toxicity detection and Four Horsemen analysis
+
 ** DONE Setup marcusk@cellophanemail.com Email Forwarding
    CLOSED: [2025-08-16]
    - [X] Added database entry for marcusk@cellophanemail.com → goldenfermi@gmail.com
@@ -114,6 +130,41 @@
    - Settings integration for OAuth configuration
 
 * IN PROGRESS 🚧
+
+** TODO Optimize Decision Thresholds
+   - [ ] Current thresholds seem too strict (clean emails getting 0.218-0.322 toxicity)
+   - [ ] Need to calibrate based on real LLM behavior patterns  
+   - [ ] Adjust graduated decision boundaries for better accuracy
+   - [ ] Test with more diverse email samples to find optimal boundaries
+
+** TODO Performance & Cost Optimization
+   - [ ] Real LLM calls are slow and expensive
+   - [ ] Implement caching for similar emails
+   - [ ] Consider temperature=0 for more deterministic responses in production
+   - [ ] Add batch processing capabilities
+   - [ ] Monitor API usage and costs
+
+** TODO Production Readiness
+   - [ ] Add rate limiting for API calls
+   - [ ] Implement fallback strategies if LLM is unavailable
+   - [ ] Add monitoring/logging for LLM response quality
+   - [ ] Error handling and retry logic
+   - [ ] Health checks and system status monitoring
+
+** TODO Expand Test Coverage  
+   - [ ] Build larger test suite with diverse languages/cultures
+   - [ ] Add edge cases and boundary conditions
+   - [ ] Create regression tests for known good/bad classifications
+   - [ ] Test with real-world email samples from different domains
+   - [ ] Add multilingual test cases (Korean, Spanish, etc.)
+
+** TODO Feature Completeness
+   - [ ] Implement actual redaction functionality (currently just marks content)
+   - [ ] Add summarization capability using LLM
+   - [ ] Build email forwarding with context injection
+   - [ ] Add user preference settings for protection levels
+   - [ ] Create admin dashboard for monitoring decisions
+
 ** TODO Add session management
    - [ ] Implement JWT token generation
    - [ ] Create session middleware
