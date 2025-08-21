@@ -1,9 +1,12 @@
 """Models for email protection feature."""
 
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
+
+if TYPE_CHECKING:
+    from .graduated_decision_maker import ProtectionAction
 
 
 class ThreatLevel(Enum):
@@ -45,6 +48,10 @@ class ProtectionResult:
     forwarded_to: Optional[List[str]]
     logged_at: datetime
     message_id: str
+    # Graduated decision fields
+    protection_action: Optional['ProtectionAction'] = None
+    processed_content: Optional[str] = None
+    decision_reasoning: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for API responses."""
@@ -58,5 +65,9 @@ class ProtectionResult:
             "block_reason": self.block_reason,
             "forwarded_to": self.forwarded_to,
             "processing_time_ms": self.analysis.processing_time_ms if self.analysis else 0,
-            "cached": self.analysis.cached if self.analysis else False
+            "cached": self.analysis.cached if self.analysis else False,
+            # Graduated decision fields
+            "protection_action": self.protection_action.value if self.protection_action else None,
+            "processed_content": self.processed_content,
+            "decision_reasoning": self.decision_reasoning
         }

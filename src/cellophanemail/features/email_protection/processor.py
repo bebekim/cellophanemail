@@ -6,10 +6,12 @@ from datetime import datetime
 
 from ...providers.contracts import EmailMessage
 from .analyzer import FourHorsemenAnalyzer
+from .enhanced_analyzer import EnhancedFourHorsemenAnalyzer
 from .models import ProtectionResult, ThreatLevel
 from .storage import ProtectionLogStorage
 from .shared_context import SharedContext
 from .llm_analyzer import SimpleLLMAnalyzer
+from .graduated_decision_maker import GraduatedDecisionMaker, ProtectionAction
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +23,10 @@ class EmailProtectionProcessor:
     """
     
     def __init__(self, llm_analyzer: Optional[SimpleLLMAnalyzer] = None):
-        self.analyzer = FourHorsemenAnalyzer()
+        self.analyzer = EnhancedFourHorsemenAnalyzer()
         self.storage = ProtectionLogStorage()
         self.shared_context = SharedContext(llm_analyzer)
+        self.graduated_decision_maker = GraduatedDecisionMaker()
         
     async def process_email(
         self, 
@@ -94,8 +97,13 @@ class EmailProtectionProcessor:
         # Enhanced Four Horsemen analysis with shared context
         analysis = self._enhanced_four_horsemen_analysis(content, email.from_address)
         
-        # Enhanced protection decision
-        should_forward, enhanced_block_reason = self._make_enhanced_protection_decision(analysis)
+        # Enhanced protection decision using graduated decision maker
+        original_content = self._prepare_content(email)
+        protection_decision = self.graduated_decision_maker.make_decision(analysis, original_content)
+        
+        # Map graduated decision to binary decision for backward compatibility
+        should_forward = protection_decision.action != ProtectionAction.BLOCK_ENTIRELY
+        enhanced_block_reason = None if should_forward else protection_decision.reasoning
         
         # Create enhanced result
         result = ProtectionResult(
@@ -104,7 +112,11 @@ class EmailProtectionProcessor:
             block_reason=enhanced_block_reason,
             forwarded_to=[user_email] if should_forward else None,
             logged_at=datetime.now(),
-            message_id=email.message_id
+            message_id=email.message_id,
+            # Graduated decision fields
+            protection_action=protection_decision.action,
+            processed_content=protection_decision.processed_content,
+            decision_reasoning=protection_decision.reasoning
         )
         
         # Enhanced logging with shared context
@@ -143,58 +155,10 @@ class EmailProtectionProcessor:
     def _enhanced_four_horsemen_analysis(self, content: str, sender: str):
         """
         Enhanced Four Horsemen analysis incorporating shared context insights.
+        Uses EnhancedFourHorsemenAnalyzer with configurable weights and sophisticated detection.
         """
-        # Get standard Four Horsemen analysis
-        base_analysis = self.analyzer.analyze(content, sender)
-        
-        # Get current analysis summary from shared context
-        context_summary = self.shared_context.get_current_analysis_summary()
-        
-        # Enhance analysis with context insights
-        fact_ratio = context_summary.get("fact_ratio", 0.0)
-        phases = context_summary.get("phases", {})
-        
-        # Adjust toxicity score based on context
-        enhanced_toxicity = base_analysis.toxicity_score
-        
-        # Low fact ratio indicates more manipulation
-        if fact_ratio < 0.2:
-            enhanced_toxicity = min(1.0, enhanced_toxicity + 0.15)
-        
-        # Negative fact manner boosts contempt/criticism
-        manner_data = phases.get("manner_summary", {})
-        if manner_data.get("overall_manner") == "predominantly_negative":
-            enhanced_toxicity = min(1.0, enhanced_toxicity + 0.1)
-        
-        # Personal attacks boost criticism
-        non_factual_data = phases.get("non_factual_analysis", {})
-        personal_attacks = len(non_factual_data.get("personal_attacks", []))
-        if personal_attacks > 0:
-            enhanced_toxicity = min(1.0, enhanced_toxicity + (personal_attacks * 0.05))
-        
-        # Implicit threats are serious
-        implicit_data = phases.get("implicit_analysis", {})
-        implicit_threats = len(implicit_data.get("implicit_threats", []))
-        if implicit_threats > 0:
-            enhanced_toxicity = min(1.0, enhanced_toxicity + (implicit_threats * 0.1))
-        
-        # Update the analysis with enhanced toxicity score
-        base_analysis.toxicity_score = enhanced_toxicity
-        
-        # Recalculate threat level based on enhanced score
-        if enhanced_toxicity > 0.7:
-            base_analysis.threat_level = ThreatLevel.HIGH
-        elif enhanced_toxicity > 0.5:
-            base_analysis.threat_level = ThreatLevel.MEDIUM
-        elif enhanced_toxicity > 0.3:
-            base_analysis.threat_level = ThreatLevel.LOW
-        else:
-            base_analysis.threat_level = ThreatLevel.SAFE
-            
-        # Update safety determination
-        base_analysis.safe = enhanced_toxicity < 0.3
-        
-        return base_analysis
+        # Use enhanced analyzer with shared context - all sophistication is handled internally
+        return self.analyzer.analyze_with_context(content, sender, self.shared_context)
     
     def _make_enhanced_protection_decision(self, analysis) -> tuple[bool, Optional[str]]:
         """
