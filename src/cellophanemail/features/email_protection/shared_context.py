@@ -205,14 +205,7 @@ class SharedContext:
                 else:
                     raise ValueError(f"Unsupported provider: {self.llm_analyzer.provider}")
             else:
-                # Simple mock - static response for pipeline testing
-                result = """{
-                    "overall_manner": "MIXED",
-                    "reasoning": "Mock analysis for pipeline testing",
-                    "cultural_context": "Standard communication patterns",
-                    "manipulation_detected": false,
-                    "emotional_loading": "medium"
-                }"""
+                raise ValueError("No LLM analyzer available. Real LLM required for language-agnostic analysis.")
             
             # Parse JSON response
             import json
@@ -429,12 +422,7 @@ class SharedContext:
                 raise
         
         else:
-            # Simple mock - static response for pipeline testing
-            result = """
-            FACT: $500
-            FACT: last month
-            FACT: 3 times
-            """
+            raise ValueError("No LLM analyzer available. Real LLM required for language-agnostic fact extraction.")
         
         # Parse LLM response
         facts = []
@@ -638,19 +626,7 @@ class SharedContext:
             else:
                 raise ValueError(f"Unsupported provider: {self.llm_analyzer.provider}")
         else:
-            # Simple mock - static response for pipeline testing
-            result = """{
-                "personal_attacks": ["mock attack"],
-                "emotional_manipulation": ["mock manipulation"],
-                "gaslighting_patterns": [],
-                "social_manipulation": [],
-                "control_tactics": [],
-                "cultural_context": "Standard communication patterns",
-                "severity_score": 0.3,
-                "manipulation_sophistication": "low",
-                "primary_tactic": "none",
-                "confidence": 0.7
-            }"""
+            raise ValueError("No LLM analyzer available. Real LLM required for language-agnostic psychological analysis.")
         
         import json
         return json.loads(result)
@@ -898,15 +874,7 @@ class SharedContext:
             else:
                 raise ValueError(f"Unsupported provider: {self.llm_analyzer.provider}")
         else:
-            # Simple mock - static response for pipeline testing
-            result = """{
-                "threats": ["mock implicit threat"],
-                "power_plays": [],
-                "emotional_hooks": ["mock emotional hook"],
-                "social_weapons": [],
-                "confidence": 0.6,
-                "reasoning": "Mock analysis for pipeline testing"
-            }"""
+            raise ValueError("No LLM analyzer available. Real LLM required for language-agnostic implicit message analysis.")
         
         import json
         llm_result = json.loads(result)
