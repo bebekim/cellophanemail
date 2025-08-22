@@ -1,5 +1,7 @@
 """
-Ad-hoc email test cases runner.
+Ad-hoc email test cases runner using streamlined processor architecture.
+
+Uses single-pass LLM analysis (1-2 seconds) instead of legacy 4-phase pipeline (30+ seconds).
 Simply add test cases and run with: python test_email_cases.py
 """
 
@@ -11,7 +13,7 @@ from typing import List, Optional
 # Add src to path
 sys.path.insert(0, 'src')
 
-from cellophanemail.features.email_protection.processor import EmailProtectionProcessor
+from cellophanemail.features.email_protection.streamlined_processor import StreamlinedEmailProtectionProcessor
 from cellophanemail.features.email_protection.llm_analyzer import SimpleLLMAnalyzer
 from cellophanemail.providers.contracts import EmailMessage
 from cellophanemail.features.email_protection.graduated_decision_maker import ProtectionAction
@@ -83,7 +85,7 @@ TEST_CASES = [
 ]
 
 
-async def run_test_case(processor: EmailProtectionProcessor, test_case: TestCase) -> dict:
+async def run_test_case(processor: StreamlinedEmailProtectionProcessor, test_case: TestCase) -> dict:
     """Run a single test case and return results."""
     
     email = EmailMessage(
@@ -107,9 +109,8 @@ async def run_test_case(processor: EmailProtectionProcessor, test_case: TestCase
 async def main():
     """Run all test cases."""
     
-    # Initialize processor with real LLM
-    llm_analyzer = SimpleLLMAnalyzer()  # Uses real Claude API from .env
-    processor = EmailProtectionProcessor(llm_analyzer)
+    # Initialize streamlined processor with real LLM (deterministic for consistent testing)
+    processor = StreamlinedEmailProtectionProcessor(temperature=0.0)
     
     print("🧪 Running Email Protection Test Cases")
     print("=" * 50)
