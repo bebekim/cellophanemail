@@ -282,7 +282,7 @@ class AuthController(Controller):
             }
         }
     
-    @post("/logout", guards=[jwt_auth_required])
+    @post("/logout")
     async def logout_user(self, request: Request) -> Response[Dict[str, str]]:
         """Logout user (invalidate tokens and clear cookies)."""
         from cellophanemail.services.jwt_service import blacklist_token, decode_token
