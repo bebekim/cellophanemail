@@ -44,7 +44,7 @@ from .analysis_comparator import (
 
 from .test_runner import (
     FourHorsemenTestRunner,
-    TestConfiguration,
+    FourHorsemenTestConfiguration,
     run_quick_test,
     run_language_comparison_test,
     run_cost_optimization_test
@@ -69,6 +69,6 @@ __all__ = [
     "AnalysisComparator", "AnalysisComparison", "ComparisonMetrics", "MethodEffectiveness",
     
     # Test runner
-    "FourHorsemenTestRunner", "TestConfiguration",
+    "FourHorsemenTestRunner", "FourHorsemenTestConfiguration",
     "run_quick_test", "run_language_comparison_test", "run_cost_optimization_test"
 ]

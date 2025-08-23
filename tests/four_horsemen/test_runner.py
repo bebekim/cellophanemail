@@ -428,7 +428,7 @@ class FourHorsemenTestRunner:
 # Convenience functions for quick testing
 async def run_quick_test(max_samples: int = 5) -> Dict[str, Any]:
     """Run a quick test with limited samples."""
-    config = TestConfiguration(
+    config = FourHorsemenTestConfiguration(
         test_name="Quick Four Horsemen Test",
         max_samples=max_samples,
         test_hybrid_mode=True,
@@ -443,7 +443,7 @@ async def run_quick_test(max_samples: int = 5) -> Dict[str, Any]:
 
 async def run_language_comparison_test(language: str = "en") -> Dict[str, Any]:
     """Run test focused on specific language."""
-    config = TestConfiguration(
+    config = FourHorsemenTestConfiguration(
         test_name=f"Language Comparison Test ({language})",
         filter_by_language=language,
         test_hybrid_mode=True,
@@ -458,7 +458,7 @@ async def run_language_comparison_test(language: str = "en") -> Dict[str, Any]:
 
 async def run_cost_optimization_test() -> Dict[str, Any]:
     """Run test focused on cost optimization."""
-    config = TestConfiguration(
+    config = FourHorsemenTestConfiguration(
         test_name="Cost Optimization Analysis",
         test_hybrid_mode=True,
         test_traditional_mode=True,

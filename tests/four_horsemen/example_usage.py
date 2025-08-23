@@ -10,7 +10,7 @@ from datetime import datetime
 
 from .test_runner import (
     FourHorsemenTestRunner, 
-    TestConfiguration,
+    FourHorsemenTestConfiguration,
     run_quick_test,
     run_accuracy_test,
     run_cost_optimization_test
@@ -49,7 +49,7 @@ async def example_custom_test():
     print("=" * 50)
     
     # Create custom configuration
-    config = TestConfiguration(
+    config = FourHorsemenTestConfiguration(
         run_id=f"custom_{int(datetime.now().timestamp())}",
         test_name="Custom Four Horsemen Test",
         
@@ -109,7 +109,7 @@ async def example_performance_focused_test():
     print("⚡ Running Performance-Focused Test Example")
     print("=" * 50)
     
-    config = TestConfiguration(
+    config = FourHorsemenTestConfiguration(
         run_id=f"perf_{int(datetime.now().timestamp())}",
         test_name="Performance Evaluation Test",
         
@@ -245,7 +245,7 @@ async def example_comparison_analysis():
     print("=" * 50)
     
     # Run a test that includes comparisons
-    config = TestConfiguration(
+    config = FourHorsemenTestConfiguration(
         run_id=f"comparison_{int(datetime.now().timestamp())}",
         test_name="Analysis Method Comparison",
         sample_limit=10,
