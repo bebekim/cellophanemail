@@ -6,7 +6,7 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 import statistics
 
-from .metrics_collector import MetricsCollector, TestRunMetrics
+from .metrics_collector import MetricsCollector, RunMetrics
 from .analysis_comparator import AnalysisComparator
 from .pipeline_tracer import PipelineTrace
 from .test_samples import EmailTestSample, ToxicityLevel
@@ -21,7 +21,7 @@ class ReportSection:
     charts: Optional[List[Dict[str, Any]]] = None
 
 
-class TestReporter:
+class FourHorsemenReporter:
     """Generates comprehensive reports for Four Horsemen analysis testing."""
     
     def __init__(self):
@@ -29,7 +29,7 @@ class TestReporter:
         pass
     
     def generate_comprehensive_report(self, 
-                                    metrics: TestRunMetrics,
+                                    metrics: RunMetrics,
                                     comparator: AnalysisComparator,
                                     traces: List[PipelineTrace],
                                     samples: List[EmailTestSample]) -> Dict[str, Any]:
@@ -51,7 +51,7 @@ class TestReporter:
         
         return report
     
-    def _generate_metadata(self, metrics: TestRunMetrics) -> Dict[str, Any]:
+    def _generate_metadata(self, metrics: RunMetrics) -> Dict[str, Any]:
         """Generate report metadata."""
         return {
             'generated_at': datetime.now().isoformat(),
@@ -61,7 +61,7 @@ class TestReporter:
             'report_type': 'Four Horsemen Analysis Test Report'
         }
     
-    def _generate_executive_summary(self, metrics: TestRunMetrics, comparator: AnalysisComparator) -> str:
+    def _generate_executive_summary(self, metrics: RunMetrics, comparator: AnalysisComparator) -> str:
         """Generate executive summary."""
         
         accuracy = metrics.accuracy_metrics.classification_accuracy
@@ -117,7 +117,7 @@ This comprehensive test evaluated the Four Horsemen email analysis system across
         
         return summary
     
-    def _generate_overview_section(self, metrics: TestRunMetrics) -> ReportSection:
+    def _generate_overview_section(self, metrics: RunMetrics) -> ReportSection:
         """Generate test overview section."""
         
         content = f"""
@@ -152,7 +152,7 @@ This comprehensive test evaluated the Four Horsemen email analysis system across
             }
         )
     
-    def _generate_accuracy_section(self, metrics: TestRunMetrics, samples: List[EmailTestSample]) -> ReportSection:
+    def _generate_accuracy_section(self, metrics: RunMetrics, samples: List[EmailTestSample]) -> ReportSection:
         """Generate accuracy analysis section."""
         
         acc = metrics.accuracy_metrics
@@ -221,7 +221,7 @@ This comprehensive test evaluated the Four Horsemen email analysis system across
             ]
         )
     
-    def _generate_performance_section(self, metrics: TestRunMetrics, traces: List[PipelineTrace]) -> ReportSection:
+    def _generate_performance_section(self, metrics: RunMetrics, traces: List[PipelineTrace]) -> ReportSection:
         """Generate performance analysis section."""
         
         perf = metrics.performance_metrics
@@ -289,7 +289,7 @@ This comprehensive test evaluated the Four Horsemen email analysis system across
             ]
         )
     
-    def _generate_cost_analysis_section(self, metrics: TestRunMetrics) -> ReportSection:
+    def _generate_cost_analysis_section(self, metrics: RunMetrics) -> ReportSection:
         """Generate cost analysis section."""
         
         cost = metrics.cost_metrics
@@ -383,7 +383,7 @@ This comprehensive test evaluated the Four Horsemen email analysis system across
             }
         )
     
-    def _generate_detailed_results_section(self, metrics: TestRunMetrics, traces: List[PipelineTrace]) -> ReportSection:
+    def _generate_detailed_results_section(self, metrics: RunMetrics, traces: List[PipelineTrace]) -> ReportSection:
         """Generate detailed results section."""
         
         content = f"""
@@ -429,7 +429,7 @@ This comprehensive test evaluated the Four Horsemen email analysis system across
             }
         )
     
-    def _generate_recommendations_section(self, metrics: TestRunMetrics, comparator: AnalysisComparator) -> ReportSection:
+    def _generate_recommendations_section(self, metrics: RunMetrics, comparator: AnalysisComparator) -> ReportSection:
         """Generate recommendations based on test results."""
         
         recommendations = []

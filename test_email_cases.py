@@ -20,7 +20,7 @@ from cellophanemail.features.email_protection.graduated_decision_maker import Pr
 
 
 @dataclass
-class TestCase:
+class EmailTestCase:
     """A simple test case for email protection."""
     name: str
     subject: str
@@ -32,7 +32,7 @@ class TestCase:
 
 # Add your test cases here - just append to this list!
 TEST_CASES = [
-    TestCase(
+    EmailTestCase(
         name="Clean professional email",
         subject="Meeting Follow-up", 
         body="Hi Bob, Thank you for the productive meeting yesterday. Please send the timeline by Friday. Best regards, Alice",
@@ -40,7 +40,7 @@ TEST_CASES = [
         language="en"
     ),
     
-    TestCase(
+    EmailTestCase(
         name="Subtle threat",
         subject="Urgent Request",
         body="You should really consider my offer soon before it's too late.",
@@ -48,7 +48,7 @@ TEST_CASES = [
         language="en"
     ),
     
-    TestCase(
+    EmailTestCase(
         name="Personal attacks",
         subject="Feedback", 
         body="Your work is terrible and you're incompetent. Please send the report by Friday.",
@@ -56,7 +56,7 @@ TEST_CASES = [
         language="en"
     ),
     
-    TestCase(
+    EmailTestCase(
         name="Extreme toxicity",
         subject="You are pathetic",
         body="You are absolutely worthless and disgusting. I hate dealing with someone as stupid as you.",
@@ -64,7 +64,7 @@ TEST_CASES = [
         language="en"
     ),
     
-    TestCase(
+    EmailTestCase(
         name="Corporate leak threat (Zuckerberg 2010)",
         subject="Please Resign",
         body="This was an act of betrayal. So I'm asking whoever leaked this to resign immediately. If you don't resign, we will almost certainly find out who you are anyway. If you can't handle that, then just leave.",
@@ -72,7 +72,7 @@ TEST_CASES = [
         language="en"
     ),
     
-    TestCase(
+    EmailTestCase(
         name="Strategic business discussion (Zuckerberg 2022)",
         subject="FB app vision", 
         body="We've spent a lot of time recently on shifting resources from non-Reels/NF FB features to Reels and now to other apps as well. Even though the FB app's engagement is steady in many places, it feels like its cultural relevance is decreasing quickly and I worry that this may be a leading indicator of future health issues.",
@@ -85,7 +85,7 @@ TEST_CASES = [
 ]
 
 
-async def run_test_case(processor: StreamlinedEmailProtectionProcessor, test_case: TestCase) -> dict:
+async def run_test_case(processor: StreamlinedEmailProtectionProcessor, test_case: EmailTestCase) -> dict:
     """Run a single test case and return results."""
     
     email = EmailMessage(

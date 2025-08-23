@@ -31,7 +31,7 @@ from .analysis_comparator import AnalysisComparator
 
 
 @dataclass
-class TestConfiguration:
+class FourHorsemenTestConfiguration:
     """Configuration for test runs."""
     run_id: str = field(default_factory=lambda: str(uuid4())[:8])
     test_name: str = "Four Horsemen Analysis Test"
@@ -59,7 +59,7 @@ class TestConfiguration:
 class FourHorsemenTestRunner:
     """Main test runner for Four Horsemen analysis evaluation."""
     
-    def __init__(self, config: TestConfiguration):
+    def __init__(self, config: FourHorsemenTestConfiguration):
         """Initialize test runner with configuration."""
         self.config = config
         self.logger = logging.getLogger(__name__)

@@ -83,7 +83,7 @@ class TestResult:
 
 
 @dataclass
-class TestRunMetrics:
+class RunMetrics:
     """Comprehensive metrics for a complete test run."""
     classification_metrics: ClassificationMetrics
     horsemen_metrics: HorsemenMetrics  
