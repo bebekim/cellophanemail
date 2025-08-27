@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ...providers.contracts import EmailMessage
 from .models import ProtectionResult
+from ...config.privacy import PrivacyConfig
 
 logger = logging.getLogger(__name__)
 
@@ -15,28 +16,41 @@ logger = logging.getLogger(__name__)
 class ProtectionLogStorage:
     """
     Stores email protection decisions and logs.
-    This is a simple file-based implementation for demo.
-    In production, this would use a proper database.
+    Privacy-safe by default - logs only metadata, no content or PII.
     """
     
-    def __init__(self, log_dir: str = "protection_logs"):
+    def __init__(self, log_dir: str = "protection_logs", privacy_safe: bool = True):
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(exist_ok=True)
+        
+        # Initialize privacy configuration
+        if privacy_safe:
+            self.privacy_config = PrivacyConfig(
+                enable_content_logging=False,
+                enable_address_logging=False, 
+                enable_subject_logging=False,
+                hash_identifiers=True
+            )
+        else:
+            # Legacy mode for backward compatibility
+            self.privacy_config = PrivacyConfig(
+                enable_content_logging=True,
+                enable_address_logging=True,
+                enable_subject_logging=True,
+                hash_identifiers=False
+            )
         
     async def log_protection_decision(
         self, 
         email: EmailMessage, 
         result: ProtectionResult
     ) -> None:
-        """Log a protection decision."""
+        """Log a protection decision according to privacy configuration."""
         try:
+            # Build base log entry
             log_entry = {
                 "timestamp": datetime.now().isoformat(),
                 "message_id": email.message_id,
-                "from": email.from_address,
-                "to": email.to_addresses,
-                "subject": email.subject,
-                "shield_address": email.shield_address,
                 "decision": {
                     "forwarded": result.should_forward,
                     "threat_level": result.analysis.threat_level.value if result.analysis else None,
@@ -49,6 +63,20 @@ class ProtectionLogStorage:
                 }
             }
             
+            # Add content fields only if privacy config allows
+            if self.privacy_config.enable_address_logging:
+                log_entry.update({
+                    "from": email.from_address,
+                    "to": email.to_addresses,
+                    "shield_address": email.shield_address
+                })
+            
+            if self.privacy_config.enable_subject_logging:
+                log_entry["subject"] = email.subject
+            
+            # Apply privacy sanitization
+            log_entry = self.privacy_config.sanitize_log_entry(log_entry)
+            
             # Save to daily log file
             today = datetime.now().strftime("%Y-%m-%d")
             log_file = self.log_dir / f"protection_{today}.jsonl"
@@ -56,7 +84,11 @@ class ProtectionLogStorage:
             with open(log_file, "a") as f:
                 f.write(json.dumps(log_entry) + "\n")
             
-            logger.info(f"Logged protection decision for {email.message_id}")
+            # Privacy-aware logging message
+            if self.privacy_config.hash_identifiers:
+                logger.info(f"Logged privacy-safe protection decision for hashed message")
+            else:
+                logger.info(f"Logged protection decision for {email.message_id}")
             
         except Exception as e:
             logger.error(f"Failed to log protection decision: {e}")
