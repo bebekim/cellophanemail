@@ -20,14 +20,18 @@ class MemoryManager:
     - Memory-efficient storage with minimal overhead
     """
     
-    def __init__(self, max_concurrent: int = 100):
+    def __init__(self, capacity: int = 100, max_concurrent: int = None):
         """
         Initialize MemoryManager with capacity limit.
         
         Args:
-            max_concurrent: Maximum number of emails to store concurrently (default: 100)
+            capacity: Maximum number of emails to store concurrently (default: 100)
+            max_concurrent: Deprecated alias for capacity (backward compatibility)
         """
-        self.max_concurrent = max_concurrent
+        if max_concurrent is not None:
+            self.max_concurrent = max_concurrent
+        else:
+            self.max_concurrent = capacity
         self._emails: Dict[str, EphemeralEmail] = {}
         self._lock = None  # Will be created when needed for async operations
     
@@ -118,6 +122,41 @@ class MemoryManager:
                 del self._emails[message_id]
             
             return len(expired_ids)
+    
+    async def get_all_emails(self) -> List[EphemeralEmail]:
+        """
+        Get all emails currently stored in memory.
+        
+        Returns:
+            List of all EphemeralEmail objects
+        """
+        async with self._get_lock():
+            return list(self._emails.values())
+    
+    async def remove_email(self, message_id: str) -> bool:
+        """
+        Remove an email from memory by message ID.
+        
+        Args:
+            message_id: Unique identifier of the email to remove
+            
+        Returns:
+            True if email was found and removed, False otherwise
+        """
+        async with self._get_lock():
+            if message_id in self._emails:
+                del self._emails[message_id]
+                return True
+            return False
+    
+    # Additional async methods for test compatibility (with different names to avoid conflicts)
+    async def store_email_safe(self, email: EphemeralEmail) -> bool:
+        """Thread-safe async alias for storing email."""
+        return await self.store_email_async(email)
+    
+    async def get_email_safe(self, message_id: str) -> Optional[EphemeralEmail]:
+        """Thread-safe async alias for getting email."""
+        return await self.get_email_async(message_id)
     
     def get_stats(self) -> Dict[str, int]:
         """
