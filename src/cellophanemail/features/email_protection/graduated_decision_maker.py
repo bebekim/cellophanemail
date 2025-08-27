@@ -50,12 +50,12 @@ class GraduatedDecisionMaker:
         Args:
             thresholds: Custom threshold values for decision boundaries
         """
-        # Default thresholds
+        # Default thresholds - recalibrated 2025-08-23 based on real LLM scoring patterns
         self.thresholds = {
-            'forward_clean': 0.2,
-            'forward_context': 0.35,
-            'redact_harmful': 0.5,
-            'summarize_only': 0.7
+            'forward_clean': 0.30,      # Clean emails typically score 0.01-0.20
+            'forward_context': 0.55,    # Minor toxicity emails score 0.35-0.50
+            'redact_harmful': 0.70,     # Moderate toxicity emails score around 0.65
+            'summarize_only': 0.90      # High toxicity emails score 0.75-0.85
         }
         
         # Override with custom thresholds if provided

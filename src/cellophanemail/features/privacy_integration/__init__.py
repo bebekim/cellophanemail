@@ -1,0 +1,1 @@
+"""Privacy integration features for in-memory email processing."""

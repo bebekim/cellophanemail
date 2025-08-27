@@ -1,0 +1,390 @@
+#+TITLE: Unified TDD Privacy Integration Plan
+#+AUTHOR: Claude Code (TDD Expert)
+#+DATE: 2025-08-26
+#+DESCRIPTION: Systematic Red-Green-Refactor cycles for privacy-focused email architecture integration
+
+* OVERVIEW: TDD Integration Strategy
+
+This plan coordinates the Software Architect's privacy design with Test-Driven Development discipline, ensuring every integration point has corresponding failing tests before implementation.
+
+** Architecture Integration Points Identified:
+- Privacy components (EphemeralEmail, MemoryManager, InMemoryProcessor, ImmediateDelivery) ✅ IMPLEMENTED
+- Webhook controller needs privacy orchestration layer 🔄 NEEDS INTEGRATION
+- Database storage removal with migration ⚠️ NEEDS CLEANUP 
+- Background cleanup task implementation ❌ MISSING
+- LLM analyzer bridge (keeping Anthropic API) 🔄 NEEDS BRIDGE
+- Performance monitoring (3-second target) ❌ MISSING
+- Security validation (zero persistence) ❌ MISSING
+
+** TDD Methodology:
+Each cycle follows STRICT Red-Green-Refactor discipline:
+1. **RED**: Write the simplest failing test that defines required behavior
+2. **GREEN**: Write minimal code to make the test pass
+3. **REFACTOR**: Improve structure while keeping all tests green
+
+* TDD CYCLES IMPLEMENTATION PLAN
+
+** TDD CYCLE 1: Integration Foundation 
+*** RED PHASE: Create failing integration test for in-memory webhook flow
+
+**** Task: Write integration test that expects privacy-focused webhook flow
+***** Test Name: `test_webhook_uses_privacy_pipeline_not_database`
+***** Location: `/tests/integration/test_privacy_webhook_integration.py`
+***** Expected Behavior:
+- Webhook receives Postmark payload
+- Creates EphemeralEmail (not database EmailMessage)
+- Processes via InMemoryProcessor (not StreamlinedProcessor)  
+- Returns 202 Accepted with processing metadata
+- Database shows NO content storage (only metadata)
+- Memory contains email during processing
+- Memory cleanup occurs within 5 minutes
+
+***** Test Structure:
+```python
+@pytest.mark.asyncio
+async def test_webhook_uses_privacy_pipeline_not_database():
+    # RED: This test will fail because webhook still uses database
+    response = await webhook_client.post("/webhooks/postmark", json=sample_payload)
+    assert response.status_code == 202  # Async processing
+    
+    # Verify no database content storage
+    email_logs = await EmailLog.select()
+    assert all(log.content is None for log in email_logs)
+    
+    # Verify memory manager has email temporarily
+    memory_stats = privacy_orchestrator.get_memory_stats()
+    assert memory_stats['current_emails'] >= 1
+```
+
+*** GREEN PHASE: Create PrivacyWebhookOrchestrator minimal implementation
+***** File: `/src/cellophanemail/features/email_protection/privacy_orchestrator.py`
+***** Behavior: 
+- Accept webhook payloads
+- Create EphemeralEmail instances
+- Store in MemoryManager
+- Return 202 Accepted immediately
+- Process asynchronously
+
+*** REFACTOR PHASE: Extract interface and improve structure
+***** Goal: Clean separation between orchestrator and components
+***** Ensure: Single responsibility principle maintained
+
+** TDD CYCLE 2: Memory Manager Integration
+*** RED PHASE: Create failing test for singleton memory manager
+
+**** Task: Write test that verifies single global memory manager instance
+***** Test Name: `test_memory_manager_singleton_shared_across_requests`
+***** Expected Behavior:
+- Multiple webhook calls share same MemoryManager instance
+- Capacity limits apply across all requests
+- Thread safety maintained under concurrent access
+
+*** GREEN PHASE: Implement memory manager singleton with dependency injection
+***** Pattern: Use Litestar dependency injection for memory manager
+***** Thread Safety: Ensure asyncio.Lock protects concurrent access
+
+*** REFACTOR PHASE: Optimize memory manager performance
+***** Goal: Minimize lock contention
+***** Technique: Read-heavy optimizations where possible
+
+** TDD CYCLE 3: Background Cleanup Task
+*** RED PHASE: Create failing test for automatic memory cleanup
+
+**** Task: Write test that verifies expired emails are automatically removed
+***** Test Name: `test_background_cleanup_removes_expired_emails`
+***** Expected Behavior:
+- Background task runs every 60 seconds
+- Expired emails (TTL exceeded) are removed
+- Active emails are preserved
+- Cleanup metrics are logged
+
+*** GREEN PHASE: Implement Litestar background task for cleanup
+***** File: `/src/cellophanemail/background/memory_cleanup.py`
+***** Integration: Register with Litestar app lifecycle
+
+*** REFACTOR PHASE: Optimize cleanup scheduling
+***** Goal: Minimize performance impact on active requests
+***** Technique: Stagger cleanup operations
+
+** TDD CYCLE 4: Webhook Controller Integration
+*** RED PHASE: Create failing test for privacy toggle in webhook controller
+
+**** Task: Write test that webhook controller delegates to privacy orchestrator
+***** Test Name: `test_webhook_controller_delegates_to_privacy_orchestrator`
+***** Expected Behavior:
+- WebhookController detects privacy mode enabled
+- Delegates to PrivacyWebhookOrchestrator instead of StreamlinedProcessor
+- Returns async processing response
+- No direct database content storage
+
+*** GREEN PHASE: Add privacy mode toggle to WebhookController
+***** Implementation: Conditional delegation based on environment variable
+***** Environment Variable: `PRIVACY_MODE=true`
+
+*** REFACTOR PHASE: Clean separation of concerns
+***** Goal: Remove duplication between privacy and legacy flows
+***** Pattern: Strategy pattern for processing delegation
+
+** TDD CYCLE 5: Contract Tests Between Components
+*** RED PHASE: Create failing contract tests for component boundaries
+
+**** Task: Write tests that verify contracts between privacy components
+***** Test Categories:
+1. **MemoryManager ↔ EphemeralEmail Contract**
+   - Test Name: `test_memory_manager_handles_ephemeral_email_contract`
+   - Verifies: TTL expiration detection, content extraction interface
+   
+2. **InMemoryProcessor ↔ LLM Analyzer Contract**  
+   - Test Name: `test_in_memory_processor_llm_analyzer_contract`
+   - Verifies: Content format, analysis result structure
+   
+3. **ImmediateDelivery ↔ Postmark Integration Contract**
+   - Test Name: `test_immediate_delivery_postmark_contract`
+   - Verifies: Email delivery without database persistence
+
+*** GREEN PHASE: Implement adapter layers for contract compliance
+***** Pattern: Adapter pattern to bridge component interfaces
+***** Focus: Minimal implementation to satisfy contracts
+
+*** REFACTOR PHASE: Standardize contract interfaces
+***** Goal: Consistent error handling and data flow
+***** Technique: Abstract base classes for contracts
+
+** TDD CYCLE 6: LLM Analyzer Integration Bridge
+*** RED PHASE: Create failing test for LLM analyzer preservation
+
+**** Task: Write test that InMemoryProcessor uses existing Anthropic LLM analyzer
+***** Test Name: `test_in_memory_processor_preserves_anthropic_llm_calls`
+***** Expected Behavior:
+- InMemoryProcessor calls ConsolidatedLLMAnalyzer
+- Analysis results match StreamlinedProcessor format
+- API calls to Anthropic preserved (not Modal/Llama yet)
+- Processing results compatible with existing decision maker
+
+*** GREEN PHASE: Create LLMAnalyzerBridge for integration
+***** File: `/src/cellophanemail/features/email_protection/llm_bridge.py`
+***** Behavior: Wrap existing ConsolidatedLLMAnalyzer for InMemoryProcessor
+
+*** REFACTOR PHASE: Optimize analyzer call patterns
+***** Goal: Reduce duplicate analysis calls
+***** Technique: Result caching for identical content
+
+** TDD CYCLE 7: Delivery Service Integration
+*** RED PHASE: Create failing test for integrated email delivery
+
+**** Task: Write test that ImmediateDelivery uses real Postmark sender
+***** Test Name: `test_immediate_delivery_integrates_with_postmark_sender`
+***** Expected Behavior:
+- ImmediateDelivery calls EmailSenderFactory
+- Postmark integration preserved
+- Delivery retries work with real sender
+- Attribution headers (Reply-To, X-Original-From) maintained
+
+*** GREEN PHASE: Integrate EmailSenderFactory with ImmediateDeliveryManager
+***** Bridge: Connect mock delivery methods to real Postmark calls
+***** Headers: Preserve email attribution for reply functionality
+
+*** REFACTOR PHASE: Optimize delivery error handling
+***** Goal: Robust retry logic with exponential backoff
+***** Pattern: Circuit breaker for persistent delivery failures
+
+** TDD CYCLE 8: Performance Testing Integration
+*** RED PHASE: Create failing performance tests for 3-second target
+
+**** Task: Write tests that verify processing within performance targets
+***** Test Name: `test_privacy_pipeline_meets_performance_targets`
+***** Expected Behavior:
+- Complete privacy pipeline processes email in <3 seconds
+- Memory operations complete in <100ms
+- LLM analysis completes in <2.5 seconds
+- Delivery initiation completes in <200ms
+
+*** GREEN PHASE: Add performance monitoring and optimization
+***** Metrics: Instrument each pipeline stage with timing
+***** Logging: Performance metrics for monitoring
+
+*** REFACTOR PHASE: Optimize performance bottlenecks
+***** Focus: Parallel processing where possible
+***** Technique: Async optimization for I/O operations
+
+** TDD CYCLE 9: Security Testing Implementation
+*** RED PHASE: Create failing security tests for zero content persistence
+
+**** Task: Write tests that verify no content stored in database
+***** Test Categories:
+1. **Database Content Verification**
+   - Test Name: `test_privacy_pipeline_stores_no_email_content_in_database`
+   - Verifies: EmailLog entries contain no subject, text_body, html_body
+   
+2. **Memory Lifecycle Verification**
+   - Test Name: `test_email_content_completely_removed_after_processing`
+   - Verifies: No content remains in memory after TTL expiration
+   
+3. **Audit Trail Verification**
+   - Test Name: `test_privacy_audit_trail_contains_no_sensitive_data`
+   - Verifies: Logs contain only hashed identifiers and metadata
+
+*** GREEN PHASE: Implement security audit mechanisms
+***** Content Scrubbing: Verify content removal from all storage
+***** Audit Logging: Implement content-free audit trails
+
+*** REFACTOR PHASE: Strengthen security guarantees
+***** Goal: Comprehensive privacy protection validation
+***** Technique: Automated content leak detection
+
+** TDD CYCLE 10: Database Schema Migration
+*** RED PHASE: Create failing test for content field removal
+
+**** Task: Write test that verifies database schema has no content fields
+***** Test Name: `test_email_log_model_has_no_content_fields`
+***** Expected Behavior:
+- EmailLog model has no content, subject, text_body, html_body fields
+- Migration removes existing content columns
+- Backward compatibility preserved for existing metadata
+
+*** GREEN PHASE: Create database migration removing content fields
+***** Migration: Use Piccolo migration to drop content columns
+***** Safety: Backup existing content before removal
+
+*** REFACTOR PHASE: Clean up storage layer dependencies
+***** Goal: Remove all references to content storage in models
+***** Technique: Systematic removal of content-related code paths
+
+** TDD CYCLE 11: End-to-End Acceptance Testing
+*** RED PHASE: Create failing acceptance test for complete privacy flow
+
+**** Task: Write end-to-end test that verifies complete privacy architecture
+***** Test Name: `test_complete_privacy_email_protection_flow`
+***** Expected Behavior:
+1. **Webhook Receipt**: Postmark webhook received, returns 202 Accepted
+2. **Memory Storage**: Email stored temporarily in EphemeralEmail
+3. **LLM Analysis**: Content analyzed via Anthropic API (preserved)
+4. **Decision Making**: Protection action determined via graduated decision
+5. **Email Delivery**: Processed email delivered via Postmark with proper attribution  
+6. **Memory Cleanup**: Original content removed from memory within TTL
+7. **Database State**: Only metadata logged, no content persisted
+8. **Performance**: Complete flow completes within 3 seconds
+9. **Security**: No content leak verification passes
+
+*** GREEN PHASE: Integrate all privacy components into working flow
+***** Orchestration: Complete PrivacyWebhookOrchestrator implementation
+***** Error Handling: Comprehensive error recovery for all failure modes
+
+*** REFACTOR PHASE: Optimize complete flow performance and reliability
+***** Goal: Production-ready privacy-focused email protection
+***** Metrics: Full observability for monitoring and debugging
+
+* INTEGRATION CHECKPOINTS
+
+** Checkpoint 1 (After Cycle 3): Basic Privacy Flow Working
+- ✅ Privacy components integrated with webhook controller
+- ✅ Memory management working with TTL cleanup
+- ✅ Async processing returning 202 Accepted
+
+** Checkpoint 2 (After Cycle 6): LLM Integration Complete  
+- ✅ Anthropic LLM analyzer integrated with privacy pipeline
+- ✅ Analysis results compatible with existing decision making
+- ✅ Performance within acceptable bounds
+
+** Checkpoint 3 (After Cycle 9): Security Validation Complete
+- ✅ Zero content persistence verified
+- ✅ Database schema cleaned of content fields
+- ✅ Security audit tests passing
+
+** Checkpoint 4 (After Cycle 11): Production Ready
+- ✅ Complete privacy architecture operational
+- ✅ Performance targets met (3-second processing)
+- ✅ Security guarantees validated
+- ✅ End-to-end acceptance tests passing
+
+* ARCHITECTURAL VALIDATION TESTS
+
+** Component Integration Tests
+*** Memory Manager ↔ Webhook Controller
+- Concurrent request handling
+- Capacity limit enforcement  
+- Thread safety validation
+
+*** InMemoryProcessor ↔ LLM Analyzer  
+- Content format compatibility
+- Analysis result structure consistency
+- Error propagation handling
+
+*** ImmediateDelivery ↔ Email Sender
+- Postmark integration preservation
+- Retry logic with real API calls
+- Attribution header maintenance
+
+** Performance Validation Tests
+*** Processing Speed Tests
+- Complete pipeline under 3 seconds
+- Memory operations under 100ms
+- Parallel processing efficiency
+
+*** Memory Efficiency Tests
+- TTL-based cleanup effectiveness
+- Capacity limit respect
+- No memory leaks over extended operation
+
+** Security Validation Tests  
+*** Content Persistence Tests
+- Database content field verification
+- Memory cleanup verification
+- Audit trail content scrubbing
+
+*** Privacy Guarantee Tests
+- End-to-end content lifecycle tracking
+- No sensitive data in logs
+- Complete data removal validation
+
+* IMPLEMENTATION ORDER AND DEPENDENCIES
+
+** Dependencies Map:
+```
+TDD CYCLE 1 (Integration Foundation)
+    ↓
+TDD CYCLE 2 (Memory Manager) ← TDD CYCLE 3 (Background Cleanup)
+    ↓
+TDD CYCLE 4 (Webhook Integration) ← TDD CYCLE 5 (Contract Tests)
+    ↓  
+TDD CYCLE 6 (LLM Bridge) ← TDD CYCLE 7 (Delivery Integration)
+    ↓
+TDD CYCLE 8 (Performance) ← TDD CYCLE 9 (Security)
+    ↓
+TDD CYCLE 10 (Database Migration)
+    ↓
+TDD CYCLE 11 (End-to-End Acceptance)
+```
+
+** Critical Path:
+1. Cycles 1-2-4 establish core integration
+2. Cycles 6-7 connect existing systems  
+3. Cycles 8-9 validate production readiness
+4. Cycles 10-11 complete migration
+
+** Parallel Implementation:
+- Cycles 2-3 can run in parallel (Memory + Cleanup)
+- Cycles 5 can run parallel with 4 (Contract tests)
+- Cycles 6-7 can run in parallel (LLM + Delivery)
+- Cycles 8-9 can run in parallel (Performance + Security)
+
+* HANDOFF TO IMPLEMENTATION
+
+** TDD_HANDOFF_5: Complete implementation plan ready
+- Every architectural component has corresponding TDD cycle
+- All integration points have contract tests defined
+- Performance and security requirements have test specifications
+- Database migration has backward-compatible test strategy
+- End-to-end acceptance test validates complete architecture
+
+** Ready for Red-Green-Refactor Implementation:
+This plan provides the systematic approach to integrate the privacy architecture using strict TDD discipline. Each cycle has clear failing test specifications, minimal implementation goals, and refactoring targets.
+
+** Next Steps:
+1. Begin with TDD CYCLE 1: Create failing integration test
+2. Follow Red-Green-Refactor strictly for each cycle
+3. Use integration checkpoints to validate progress
+4. Maintain all tests green throughout implementation
+5. Complete architectural validation tests at each checkpoint
+
+** DESIGN_COMPLETE: Privacy integration architecture fully specified with TDD methodology

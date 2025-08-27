@@ -35,6 +35,8 @@ dependencies = [
     "postmark>=1.0.0",
     "python-dotenv>=1.1.1",
     "aiohttp>=3.12.15",
+    "ollama>=0.5.3",
+    "llama-cpp-python>=0.3.2",
 ]
 
 [project.optional-dependencies]

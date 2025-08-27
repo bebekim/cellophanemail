@@ -28,12 +28,13 @@ logger = logging.getLogger(__name__)
 
 
 # Empirically calibrated thresholds based on real LLM behavior
-# Updated based on actual toxicity score distributions from testing
+# Updated 2025-08-23: Recalibrated based on analysis of 88 real email scores
+# Score distribution: 0.01-0.05 (clean), 0.35-0.45 (minor), 0.65 (moderate), 0.75-0.95 (high)
 EMPIRICAL_THRESHOLDS = {
-    'forward_clean': 0.10,       # Allow slightly higher "clean" scores (was 0.05)
-    'forward_context': 0.25,     # Accommodate minor toxicity better (was 0.15)
-    'redact_harmful': 0.50,      # Match legacy system expectations (was 0.35)
-    'summarize_only': 0.75       # Allow "subtle threats" to be processed (was 0.60)
+    'forward_clean': 0.30,       # Clean emails score 0.01-0.20, with some variance
+    'forward_context': 0.55,     # Minor toxicity emails score 0.35-0.50
+    'redact_harmful': 0.70,      # Moderate toxicity emails score 0.65
+    'summarize_only': 0.90       # High toxicity emails score 0.75-0.85
 }
 
 

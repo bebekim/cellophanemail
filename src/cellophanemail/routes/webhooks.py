@@ -10,31 +10,16 @@ from litestar.status_codes import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_404_NO
 from pydantic import BaseModel
 
 from ..core.email_message import EmailMessage
+from ..core.webhook_models import PostmarkWebhookPayload
 
 # Use new provider/feature architecture (legacy support removed)
 from ..providers.postmark.provider import PostmarkProvider
 from ..features.email_protection import EmailProtectionProcessor
 from ..features.shield_addresses import ShieldAddressManager
+from ..features.privacy_integration.privacy_webhook_orchestrator import PrivacyWebhookOrchestrator
 
 logger = logging.getLogger(__name__)
 logger.info("Using new provider/feature architecture for email processing")
-
-
-class PostmarkWebhookPayload(BaseModel):
-    """Postmark inbound webhook payload structure."""
-    
-    From: str
-    FromName: Optional[str] = None
-    To: str
-    ToFull: Optional[List[Dict[str, str]]] = None
-    Subject: str
-    MessageID: str
-    Date: str
-    TextBody: Optional[str] = None
-    HtmlBody: Optional[str] = None
-    Tag: Optional[str] = None
-    Headers: Optional[List[Dict[str, str]]] = None
-    Attachments: Optional[List[Dict[str, Any]]] = None
 
 
 class WebhookController(Controller):

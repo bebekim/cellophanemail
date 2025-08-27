@@ -131,6 +131,192 @@
 
 * IN PROGRESS 🚧
 
+** TODO URGENT: Privacy-Focused Email Architecture Implementation
+   SCHEDULED: <2025-08-25>
+   
+   **PRIVACY PROBLEM:** Currently storing email content in database violates privacy principles for both opensource and commercial versions. 
+   
+   **SOLUTION ARCHITECTURE:**
+   - Keep using Anthropic Claude API for now (Modal.com/Llama 3.1 8B postponed)
+   - Ephemeral storage (process in memory, 5-minute auto-cleanup)
+   - Metadata-only logging (hashed identifiers, no content)
+   - Target performance: <3s processing time
+   
+   **IMPLEMENTATION STATUS:**
+   
+   *** POSTPONED: Local LLM Integration via Modal.com
+   DECISION: Continue using Anthropic API, postpone Modal.com/Llama 3.1 8B migration
+   - [ ] Set up Modal.com account and Llama 3.1 8B deployment (POSTPONED)
+   - [ ] Create Modal.com integration wrapper for existing LLM analyzer (POSTPONED)
+   - [ ] Replace Anthropic API calls with Modal.com endpoint (POSTPONED)
+   - [ ] Add fallback error handling for Modal.com API failures (POSTPONED)
+   - [ ] Test performance benchmarks (target: <3s per email) (POSTPONED)
+   - [ ] Verify technical feasibility of full migration path (POSTPONED)
+
+** TODO DECIDED: No Database Storage Architecture
+   SCHEDULED: <2025-08-25>
+   
+   **FINAL DECISION:** Pure in-memory processing with user's email provider as backup
+   - No content stored in CellophoneMail database
+   - Abusive emails archived to user's spam folder (via Gmail/Outlook API later)
+   - Clean emails forwarded directly
+   - Legal/privacy optimal approach accepted
+   
+   **ARCHITECTURE COMPLETED:**
+   ✅ Designed complete in-memory workflow
+   ✅ Identified all actors and components
+   ✅ Created data structures (EphemeralEmail, ProcessingResult, MemoryManager)
+   ✅ Defined processing pipeline: Webhook → Memory → LLM → Delivery → Cleanup
+   
+   **KEY DESIGN DECISIONS:**
+   - 5-minute TTL for emails in memory
+   - Max 50 concurrent emails to prevent memory exhaustion
+   - 202 Accepted webhook response (async processing)
+   - 3 retry attempts with exponential backoff
+   - Metadata-only logging (no content)
+   
+   *** PRIVACY COMPONENTS STATUS
+   ✅ EphemeralEmail data class with TTL management (IMPLEMENTED)
+   ✅ MemoryManager for lifecycle and capacity limits (IMPLEMENTED)
+   ✅ InMemoryProcessor wrapper (uses existing LLM analyzer) (IMPLEMENTED)
+   ✅ ImmediateDeliveryManager with retry logic (IMPLEMENTED)
+   ✅ Basic unit tests for all privacy components (IMPLEMENTED)
+   
+   *** TDD INTEGRATION PLAN (SYSTEMATIC RED-GREEN-REFACTOR CYCLES)
+   
+   **** TDD CYCLE 1: Integration Foundation [CURRENT FOCUS]
+   - [ ] RED: Write failing test `test_webhook_uses_privacy_pipeline_not_database`
+   - [ ] GREEN: Create PrivacyWebhookOrchestrator minimal implementation  
+   - [ ] REFACTOR: Extract interface and improve structure
+   - [ ] CHECKPOINT: Basic privacy flow working with 202 Accepted responses
+   
+   **** TDD CYCLE 2: Memory Manager Integration
+   - [ ] RED: Write failing test `test_memory_manager_singleton_shared_across_requests`
+   - [ ] GREEN: Implement memory manager singleton with dependency injection
+   - [ ] REFACTOR: Optimize memory manager performance (minimize lock contention)
+   - [ ] CHECKPOINT: Concurrent request handling with capacity limits
+   
+   **** TDD CYCLE 3: Background Cleanup Task  
+   - [ ] RED: Write failing test `test_background_cleanup_removes_expired_emails`
+   - [ ] GREEN: Implement Litestar background task for cleanup
+   - [ ] REFACTOR: Optimize cleanup scheduling to minimize performance impact
+   - [ ] CHECKPOINT: Automated TTL-based memory cleanup working
+   
+   **** TDD CYCLE 4: Webhook Controller Integration
+   - [ ] RED: Write failing test `test_webhook_controller_delegates_to_privacy_orchestrator`
+   - [ ] GREEN: Add privacy mode toggle to WebhookController (PRIVACY_MODE=true)
+   - [ ] REFACTOR: Clean separation using Strategy pattern for processing delegation
+   - [ ] CHECKPOINT: Webhook controller routes to privacy pipeline when enabled
+   
+   **** TDD CYCLE 5: Component Contract Tests
+   - [ ] RED: Write contract tests for all component boundaries:
+     - [ ] `test_memory_manager_handles_ephemeral_email_contract`
+     - [ ] `test_in_memory_processor_llm_analyzer_contract`
+     - [ ] `test_immediate_delivery_postmark_contract`
+   - [ ] GREEN: Implement adapter layers for contract compliance
+   - [ ] REFACTOR: Standardize contract interfaces with abstract base classes
+   - [ ] CHECKPOINT: All component integrations validated via contract tests
+   
+   **** TDD CYCLE 6: LLM Analyzer Integration Bridge  
+   - [ ] RED: Write failing test `test_in_memory_processor_preserves_anthropic_llm_calls`
+   - [ ] GREEN: Create LLMAnalyzerBridge wrapping ConsolidatedLLMAnalyzer
+   - [ ] REFACTOR: Optimize analyzer call patterns with result caching
+   - [ ] CHECKPOINT: Anthropic LLM integration preserved with privacy pipeline
+   
+   **** TDD CYCLE 7: Delivery Service Integration
+   - [ ] RED: Write failing test `test_immediate_delivery_integrates_with_postmark_sender`
+   - [ ] GREEN: Integrate EmailSenderFactory with ImmediateDeliveryManager
+   - [ ] REFACTOR: Optimize delivery error handling with circuit breaker pattern
+   - [ ] CHECKPOINT: Email delivery working with proper attribution headers
+   
+   **** TDD CYCLE 8: Performance Testing Integration
+   - [ ] RED: Write failing test `test_privacy_pipeline_meets_performance_targets`
+   - [ ] GREEN: Add performance monitoring and instrumentation
+   - [ ] REFACTOR: Optimize performance bottlenecks with parallel processing
+   - [ ] CHECKPOINT: Complete pipeline processing within 3-second target
+   
+   **** TDD CYCLE 9: Security Testing Implementation
+   - [ ] RED: Write failing security tests:
+     - [ ] `test_privacy_pipeline_stores_no_email_content_in_database`
+     - [ ] `test_email_content_completely_removed_after_processing`
+     - [ ] `test_privacy_audit_trail_contains_no_sensitive_data`
+   - [ ] GREEN: Implement security audit mechanisms and content scrubbing
+   - [ ] REFACTOR: Strengthen security guarantees with automated leak detection
+   - [ ] CHECKPOINT: Zero content persistence verified with comprehensive security tests
+   
+   **** TDD CYCLE 10: Database Schema Migration
+   - [ ] RED: Write failing test `test_email_log_model_has_no_content_fields`
+   - [ ] GREEN: Create Piccolo migration removing content columns with backup
+   - [ ] REFACTOR: Clean up storage layer dependencies and content-related code
+   - [ ] CHECKPOINT: Database schema cleaned with backward compatibility preserved
+   
+   **** TDD CYCLE 11: End-to-End Acceptance Testing
+   - [ ] RED: Write failing test `test_complete_privacy_email_protection_flow` covering:
+     - [ ] Webhook receipt (202 Accepted)
+     - [ ] Memory storage (EphemeralEmail)
+     - [ ] LLM analysis (Anthropic API preserved)
+     - [ ] Decision making (graduated decision)  
+     - [ ] Email delivery (Postmark with attribution)
+     - [ ] Memory cleanup (TTL expiration)
+     - [ ] Database state (metadata only)
+     - [ ] Performance (complete flow <3 seconds)
+     - [ ] Security (no content leak verification)
+   - [ ] GREEN: Integrate all privacy components into working flow
+   - [ ] REFACTOR: Optimize complete flow for production reliability
+   - [ ] CHECKPOINT: Production-ready privacy-focused email protection
+   
+   *** DATABASE MIGRATION TASKS
+   - [ ] Create Piccolo migration to remove content fields: subject, text_body, html_body, content
+   - [ ] Update EmailLog model to exclude content fields
+   - [ ] Remove storage.log_protection_decision() content storage calls
+   - [ ] Preserve metadata fields: message_id, from_address, user_email, toxicity_score, timestamp
+   - [ ] Test migration with existing data backup and restore capability
+   
+   *** INTEGRATION ARCHITECTURE COMPONENTS
+   
+   **** New Files to Create
+   - [ ] `/src/cellophanemail/config/privacy.py` - Privacy configuration management
+   - [ ] `/src/cellophanemail/features/email_protection/metadata_logger.py` - Metadata-only logging
+   - [ ] `/src/cellophanemail/features/email_protection/privacy_webhook_controller.py` - Privacy orchestrator wrapper
+   - [ ] `/src/cellophanemail/tasks/email_cleanup.py` - Background cleanup task for expired emails
+   - [ ] `/src/cellophanemail/features/email_protection/llm_analyzer_bridge.py` - Bridge to preserve Anthropic
+   
+   **** Integration Points Architecture
+   - [ ] Webhook Controller → PrivacyWebhookOrchestrator → MemoryManager
+   - [ ] MemoryManager → InMemoryProcessor → Anthropic API (via LLMAnalyzerBridge)
+   - [ ] ProcessingResult → ImmediateDeliveryManager → Postmark
+   - [ ] Background Task → MemoryManager cleanup (5-minute TTL)
+   - [ ] All components → MetadataLogger (no content, hashed identifiers only)
+   
+   **** Configuration Management
+   - [ ] PRIVACY_MODE environment variable (true/false) to toggle privacy pipeline
+   - [ ] MAX_CONCURRENT_EMAILS = 50 (memory capacity limit)
+   - [ ] EMAIL_TTL_SECONDS = 300 (5-minute expiration)
+   - [ ] CLEANUP_INTERVAL_SECONDS = 60 (cleanup task frequency)
+   - [ ] MAX_RETRY_ATTEMPTS = 3 (delivery retry configuration)
+   
+   **** Error Handling Strategy
+   - [ ] Memory exhaustion: Return 503 Service Unavailable when at capacity
+   - [ ] LLM failure: Queue for retry with exponential backoff
+   - [ ] Delivery failure: Retry 3 times, then log failure (metadata only)
+   - [ ] Cleanup failure: Log error and retry on next interval
+   - [ ] Circuit breaker pattern for external service failures
+   
+   **** Monitoring & Observability (Metadata Only)
+   - [ ] Processing time metrics per email (without content)
+   - [ ] Memory usage tracking and alerts
+   - [ ] Success/failure rates by protection action
+   - [ ] API call latency and error rates
+   - [ ] Privacy compliance audit logs (verify zero content)
+   
+   **** Critical Path Implementation Order
+   1. TDD Cycle 1: Integration Foundation (PrivacyWebhookOrchestrator)
+   2. TDD Cycle 2: Memory Manager singleton setup
+   3. TDD Cycle 4: Database content removal
+   4. TDD Cycle 6: LLM Analyzer Bridge (preserve Anthropic)
+   5. TDD Cycle 7: Delivery integration
+   6. TDD Cycles 8-11: Validation, security, and production readiness
+
 ** TODO Optimize Decision Thresholds
    - [ ] Current thresholds seem too strict (clean emails getting 0.218-0.322 toxicity)
    - [ ] Need to calibrate based on real LLM behavior patterns  
@@ -164,6 +350,25 @@
    - [ ] Build email forwarding with context injection
    - [ ] Add user preference settings for protection levels
    - [ ] Create admin dashboard for monitoring decisions
+
+** TODO Email Forwarding Architecture - Shield Address Flow
+   - [ ] Design proper email flow: User's email → Shield address → Analysis → Back to user
+   - [ ] Implement email delivery back to user with original sender attribution (without spoofing)
+   - [ ] Use Reply-To header for original sender email
+   - [ ] Add X-Original-From custom header for transparency
+   - [ ] Consider subject prefix or modified From field: "Sender via CellophoneMail"
+   - [ ] Build processed email delivery function with protection result integration
+   - [ ] Handle different protection actions (FORWARD_CLEAN, REDACT_HARMFUL, SUMMARIZE_ONLY)
+   - [ ] Add toxicity score and horsemen detection info to delivered email
+   
+   **Architecture Options:**
+   1. Manual forwarding: Users configure their email provider to forward ALL emails to shield address
+   2. OAuth Integration: Direct access to monitor specific labels/folders and add processed emails back
+   3. IMAP Integration: Poll user's inbox for emails matching patterns
+   4. Webhook Integration: Gmail/Outlook webhooks for new emails
+   
+   **Key Challenge:** Can't selectively auto-forward "potentially abusive" emails from user's inbox
+   **Solution:** Either use shield address as primary contact OR integrate directly with email provider
 
 ** TODO Add session management
    - [ ] Implement JWT token generation

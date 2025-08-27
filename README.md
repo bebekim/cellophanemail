@@ -229,6 +229,46 @@ python tools/sync-repos.py --target=both          # Sync both (default)
 - **Commercial**: Proprietary license with key validation
 - **Runtime checking**: Commercial features require valid license key
 
+## 🔐 Privacy-Focused Architecture
+
+### The Privacy Problem
+Current email protection systems violate privacy by:
+- **Storing email content in databases** (privacy breach)
+- **Sending data to external LLM APIs** (data leaves your control)
+- **Keeping emails forever** (unnecessary data retention)
+
+### The Solution: Zero-Persistence Architecture
+
+**Current Flow (PRIVACY VIOLATION):**
+```
+Email → Webhook → Database (stores content) → LLM API → Database (logs) → Delivery
+```
+
+**New Flow (PRIVACY-SAFE):**
+```
+Email → Webhook → Memory (5 min) → LLM → Immediate Delivery → Auto-Cleanup
+         ↓                                                          ↓
+    [202 Accepted]                                        [Metadata Only to DB]
+```
+
+### Privacy Components (Already Implemented)
+- ✅ **EphemeralEmail** - Temporary email container with 5-minute lifetime
+- ✅ **MemoryManager** - Manages 50 concurrent emails in RAM only
+- ✅ **InMemoryProcessor** - Processes emails without database
+- ✅ **ImmediateDeliveryManager** - Delivers and forgets
+
+### Privacy Guarantees
+- **Zero Content Persistence** - Email content never touches the database
+- **5-Minute Memory Limit** - All emails auto-deleted from memory after 5 minutes
+- **Metadata-Only Logging** - Only anonymous statistics stored (no content)
+- **No External Data Storage** - Processing happens entirely in your infrastructure
+
+### Implementation Status
+- ✅ Privacy components built and tested
+- 🚧 Integration with webhook controller in progress
+- 🚧 Database migration to remove content fields pending
+- 🚧 Background cleanup task implementation pending
+
 ## 🧪 Four Horsemen Framework
 
 ### Overview
@@ -239,11 +279,11 @@ CellophoneMail implements Gottman's Four Horsemen of the Apocalypse framework to
 3. **Defensiveness** - Playing victim, counter-attacking, excuse-making
 4. **Stonewalling** - Emotional withdrawal, communication shutdown
 
-### Analysis Pipeline
+### Analysis Pipeline (Privacy-Safe)
 ```
-Inbound Email → Webhook → Email Processor → Content Processor → Four Horsemen Analyzer
-     ↓              ↓              ↓               ↓               ↓
-Cache Check → Local Analysis → AI Analysis (if needed) → Classification → Forward/Block
+Inbound Email → Webhook → Memory Storage → In-Memory Processor → Four Horsemen Analyzer
+     ↓              ↓           ↓                ↓                      ↓
+[202 Accepted] → [5-min TTL] → [No DB] → [LLM Analysis] → Forward/Block → Cleanup
 ```
 
 ### Testing Framework
