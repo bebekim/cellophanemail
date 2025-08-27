@@ -7,6 +7,7 @@ from typing import List, Optional
 from .ephemeral_email import EphemeralEmail
 from .graduated_decision_maker import ProtectionAction
 from .llama_analyzer import LlamaAnalyzer
+from .contracts import EmailProcessorInterface
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ class ProcessingResult:
     reasoning: Optional[str] = None
 
 
-class InMemoryProcessor:
+class InMemoryProcessor(EmailProcessorInterface):
     """
     In-memory email processor for privacy-focused email protection.
     

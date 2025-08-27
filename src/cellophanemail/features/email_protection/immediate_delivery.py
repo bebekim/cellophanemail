@@ -7,6 +7,7 @@ from typing import Optional
 
 from .ephemeral_email import EphemeralEmail
 from .in_memory_processor import ProcessingResult
+from .contracts import DeliveryManagerInterface
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class DeliveryResult:
     delivery_time_ms: Optional[int] = None
 
 
-class ImmediateDeliveryManager:
+class ImmediateDeliveryManager(DeliveryManagerInterface):
     """
     Manages immediate delivery of processed emails with retry logic.
     

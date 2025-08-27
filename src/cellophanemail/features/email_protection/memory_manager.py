@@ -3,9 +3,10 @@
 import asyncio
 from typing import Dict, Optional, List
 from .ephemeral_email import EphemeralEmail
+from .contracts import MemoryStorageInterface
 
 
-class MemoryManager:
+class MemoryManager(MemoryStorageInterface):
     """
     Thread-safe manager for in-memory email storage with capacity limits.
     

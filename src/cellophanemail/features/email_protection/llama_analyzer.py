@@ -9,11 +9,12 @@ import logging
 from typing import Dict, Optional, Any
 from pathlib import Path
 from llama_cpp import Llama
+from .contracts import LLMAnalyzerInterface
 
 logger = logging.getLogger(__name__)
 
 
-class LlamaAnalyzer:
+class LlamaAnalyzer(LLMAnalyzerInterface):
     """Local Llama model analyzer for privacy-preserving email analysis."""
     
     def __init__(
