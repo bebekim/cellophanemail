@@ -1,95 +1,65 @@
 """
-TDD CYCLE 1: Test webhook integration with privacy pipeline (not database storage).
-
-This test enforces that webhooks use the new in-memory privacy architecture
-instead of storing email content in the database.
+TDD CYCLE 1: Privacy Webhook Integration Tests
+Test that webhook uses privacy pipeline instead of database storage
 """
-
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from litestar import Request
-from litestar.testing import TestClient
-
-from src.cellophanemail.routes.webhooks import WebhookController
-from src.cellophanemail.core.webhook_models import PostmarkWebhookPayload
+from unittest.mock import Mock, patch, AsyncMock
+from datetime import datetime, timedelta
+from cellophanemail.features.email_protection.ephemeral_email import EphemeralEmail
+from cellophanemail.features.email_protection.memory_manager import MemoryManager
 
 
 class TestPrivacyWebhookIntegration:
-    """RED PHASE: These tests will FAIL until privacy integration is implemented."""
-
+    """Test privacy-focused webhook processing without database storage"""
+    
     @pytest.mark.asyncio
     async def test_webhook_uses_privacy_pipeline_not_database(self):
         """
-        RED TEST: Ensure PrivacyWebhookOrchestrator can be imported and instantiated.
-        
-        This simple test verifies the basic class exists and is importable.
+        RED TEST: Webhook should use InMemoryProcessor instead of database storage
+        This test verifies the privacy pipeline is used instead of database
         """
-        # ACT: Import and instantiate the privacy orchestrator
-        from src.cellophanemail.features.privacy_integration.privacy_webhook_orchestrator import PrivacyWebhookOrchestrator
-        
-        orchestrator = PrivacyWebhookOrchestrator()
-        
-        # ASSERT: Should be able to create instance
-        assert orchestrator is not None
-        assert hasattr(orchestrator, 'process_webhook')
-        assert hasattr(orchestrator, 'memory_manager')
-
-    @pytest.mark.asyncio 
-    async def test_privacy_orchestrator_returns_202_accepted(self):
-        """
-        RED TEST: PrivacyWebhookOrchestrator should return 202 Accepted 
-        for asynchronous in-memory processing.
-        
-        This enforces that we don't block the webhook response waiting for processing.
-        """
-        # This import will FAIL - PrivacyWebhookOrchestrator doesn't exist
-        from src.cellophanemail.features.privacy_integration.privacy_webhook_orchestrator import PrivacyWebhookOrchestrator
-        
-        orchestrator = PrivacyWebhookOrchestrator()
-        
-        webhook_payload = PostmarkWebhookPayload(
-            From="test@example.com",
-            To="user@cellophanemail.com",
-            Subject="Async Test", 
-            MessageID="async-test-001",
-            Date="2025-08-27T10:00:00Z",
-            TextBody="Test async processing"
+        # Arrange
+        from cellophanemail.features.privacy_integration.privacy_webhook_orchestrator import (
+            PrivacyWebhookOrchestrator
         )
         
-        # ACT: Process webhook (will fail - method doesn't exist)
-        result = await orchestrator.process_webhook(webhook_payload)
+        # Create mock webhook payload (similar to Postmark webhook)
+        from cellophanemail.core.webhook_models import PostmarkWebhookPayload
+        webhook_payload = PostmarkWebhookPayload(
+            MessageID="test-123",
+            From="sender@example.com",
+            To="shield@cellophanemail.com",
+            Subject="Test Email",
+            Date="2025-01-08T10:00:00Z",
+            TextBody="This is a test email content",
+            HtmlBody="<p>This is a test email content</p>"
+        )
         
-        # ASSERT: Should return 202 status for async processing
-        assert result["status"] == "accepted"
-        assert result["message_id"] == "async-test-001"
-        assert result["processing"] == "async_privacy_pipeline"
-
-    @pytest.mark.asyncio
-    async def test_privacy_orchestrator_delegates_to_memory_manager(self):
-        """
-        RED TEST: PrivacyWebhookOrchestrator should delegate to MemoryManager
-        for in-memory storage instead of database.
-        """
-        from src.cellophanemail.features.privacy_integration.privacy_webhook_orchestrator import PrivacyWebhookOrchestrator
-        from src.cellophanemail.features.email_protection.memory_manager import MemoryManager
+        # Create orchestrator (fresh instance has clean memory)
+        orchestrator = PrivacyWebhookOrchestrator()
         
-        # Mock MemoryManager
-        with patch.object(MemoryManager, 'store_email') as mock_store:
-            mock_store.return_value = True  # Storage success
+        # Mock the database to ensure it's NOT called
+        with patch('cellophanemail.features.email_protection.storage.ProtectionLogStorage.log_protection_decision') as mock_db:
+            # Act
+            result = await orchestrator.process_webhook(webhook_payload)
             
-            orchestrator = PrivacyWebhookOrchestrator()
+            # Assert
+            # 1. Database should NOT be called to store content
+            mock_db.assert_not_called()
             
-            webhook_payload = PostmarkWebhookPayload(
-                From="delegation@example.com",
-                To="target@cellophanemail.com", 
-                Subject="Memory Delegation Test",
-                MessageID="delegation-test-001",
-                Date="2025-08-27T10:00:00Z",
-                TextBody="This should go to memory"
-            )
+            # 2. Result should indicate success (status: accepted)
+            assert result["status"] == "accepted"
+            assert result["message_id"] == "test-123"
+            assert result["processing"] == "async_privacy_pipeline"
             
-            # ACT: Process webhook
-            await orchestrator.process_webhook(webhook_payload)
+            # 3. Email should be in memory manager (not database)
+            stats = orchestrator.memory_manager.get_stats()
+            assert stats['current_emails'] > 0
             
-            # ASSERT: MemoryManager.store_email should be called
-            mock_store.assert_called_once()
+            # 4. Email should be retrievable by message ID and have proper TTL
+            stored_email = orchestrator.memory_manager.get_email("test-123")
+            assert stored_email is not None
+            assert isinstance(stored_email, EphemeralEmail)
+            assert stored_email.message_id == "test-123"
+            assert stored_email.ttl_seconds == 300  # 5 minutes
+            assert not stored_email.is_expired  # Should not be expired immediately
