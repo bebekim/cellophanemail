@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from .ephemeral_email import EphemeralEmail
 from .graduated_decision_maker import ProtectionAction
+from .llama_analyzer import LlamaAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -47,15 +48,28 @@ class InMemoryProcessor:
     once database storage dependencies are removed from that component.
     """
     
-    def __init__(self, temperature: float = 0.0):
+    def __init__(self, temperature: float = 0.0, use_llm: bool = True):
         """
         Initialize InMemoryProcessor with specified analysis parameters.
         
         Args:
             temperature: Analysis temperature (0.0 for deterministic results, 
                         higher values for more varied analysis in production)
+            use_llm: Whether to use LlamaAnalyzer (True) or simple heuristics (False)
         """
         self.temperature = temperature
+        self.use_llm = use_llm
+        
+        # Initialize LLM analyzer if requested
+        if self.use_llm:
+            try:
+                self.llm_analyzer = LlamaAnalyzer(temperature=temperature)
+            except (ValueError, Exception) as e:
+                logger.warning(f"Failed to initialize LlamaAnalyzer: {e}. Falling back to heuristics.")
+                self.use_llm = False
+                self.llm_analyzer = None
+        else:
+            self.llm_analyzer = None
         
         # Toxicity analysis thresholds aligned with graduated decision maker
         self.thresholds = {
@@ -77,9 +91,16 @@ class InMemoryProcessor:
         """
         logger.info(f"Processing ephemeral email {email.message_id}")
         
-        # Minimal implementation: analyze content for basic toxicity
+        # Analyze content for toxicity (using LLM or heuristics)
         content = email.get_content_for_analysis()
-        toxicity_score = self._analyze_content_toxicity(content)
+        
+        if self.use_llm and self.llm_analyzer:
+            # Use LLM for analysis
+            llm_result = self.llm_analyzer.analyze_toxicity(content)
+            toxicity_score = llm_result.get('toxicity_score', 0.0)
+        else:
+            # Fall back to heuristics
+            toxicity_score = self._analyze_content_toxicity(content)
         
         # Graduated decision making using configured thresholds
         if toxicity_score < self.thresholds['forward_clean']:
