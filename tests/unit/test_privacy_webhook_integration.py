@@ -63,3 +63,28 @@ class TestPrivacyWebhookIntegration:
             assert stored_email.message_id == "test-123"
             assert stored_email.ttl_seconds == 300  # 5 minutes
             assert not stored_email.is_expired  # Should not be expired immediately
+    
+    @pytest.mark.asyncio
+    async def test_privacy_orchestrator_implements_interface(self):
+        """
+        REFACTOR TEST: Ensure PrivacyWebhookOrchestrator follows interface contract
+        """
+        from cellophanemail.features.privacy_integration.privacy_webhook_orchestrator import (
+            PrivacyWebhookOrchestrator
+        )
+        from cellophanemail.features.privacy_integration.orchestrator_interface import (
+            BaseWebhookOrchestrator, WebhookOrchestrator
+        )
+        
+        orchestrator = PrivacyWebhookOrchestrator()
+        
+        # Should inherit from base class
+        assert isinstance(orchestrator, BaseWebhookOrchestrator)
+        
+        # Should implement the protocol methods
+        assert hasattr(orchestrator, 'process_webhook')
+        assert callable(orchestrator.process_webhook)
+        
+        # Should have standardized response creation
+        assert hasattr(orchestrator, '_create_response')
+        assert callable(orchestrator._create_response)
