@@ -17,15 +17,21 @@ from ..providers.postmark.provider import PostmarkProvider
 from ..features.email_protection import EmailProtectionProcessor
 from ..features.shield_addresses import ShieldAddressManager
 from ..features.privacy_integration.privacy_webhook_orchestrator import PrivacyWebhookOrchestrator
+from ..features.email_processing_strategy import ProcessingStrategyManager
 
 logger = logging.getLogger(__name__)
 logger.info("Using new provider/feature architecture for email processing")
 
 
 class WebhookController(Controller):
-    """Handle inbound email webhooks from various providers."""
+    """Handle inbound email webhooks from various providers with privacy mode support."""
     
     path = "/webhooks"
+    
+    def __init__(self, owner):
+        """Initialize controller with processing strategy manager."""
+        super().__init__(owner)
+        self.strategy_manager = ProcessingStrategyManager()
     
     @post("/postmark")
     async def handle_postmark_inbound(
@@ -40,10 +46,14 @@ class WebhookController(Controller):
             to_address = self._extract_shield_address(data)
             self._validate_domain(to_address, data.MessageID)
             user = await self._get_user(to_address, data.MessageID)
-            email_message = self._prepare_email(data, user)
-            result = await self._process_email(email_message)
             
-            return self._build_response(result, data.MessageID, user)
+            # Use strategy manager for processing (privacy mode aware)
+            processing_result = await self.strategy_manager.process_email(data, user)
+            
+            return Response(
+                content=processing_result.response_data,
+                status_code=processing_result.status_code
+            )
             
         except ValueError as e:
             return e.args[0]  # Already a formatted Response
@@ -79,103 +89,12 @@ class WebhookController(Controller):
             "organization": shield_info.organization_id
         }
     
-    def _prepare_email(self, data: PostmarkWebhookPayload, user: Dict[str, Any]) -> EmailMessage:
-        """Create EmailMessage with user context."""
-        email_message = EmailMessage.from_postmark_webhook(data.model_dump())
-        
-        user_id = self._get_user_field(user, "id")
-        user_email = self._get_user_field(user, "email")
-        user_org = self._get_user_field(user, "organization")
-        
-        logger.info(f"Routing email to user {user_id} ({user_email})")
-        
-        email_message.user_id = str(user_id)
-        email_message.organization_id = str(user_org) if user_org else None
-        email_message.to_addresses = [user_email]
-        
-        # Ensure shield_address is set for new architecture compatibility
-        if not email_message.shield_address:
-            email_message.shield_address = data.To.lower().strip()
-        
-        return email_message
     
     def _get_user_field(self, user: Any, field: str) -> Optional[str]:
         """Safely extract field from user (handles dict or object)."""
         return user.get(field) if isinstance(user, dict) else getattr(user, field, None)
     
-    async def _process_email(self, email_message: EmailMessage) -> Any:
-        """Process email through new provider/feature architecture."""
-        logger.info(f"Processing email {email_message.message_id} via new provider/feature architecture")
-        
-        # Use new architecture components directly
-        shield_manager = ShieldAddressManager()
-        protection = EmailProtectionProcessor()
-        
-        # Look up shield address to get user info
-        shield_info = await shield_manager.lookup_user_by_shield_address(email_message.shield_address or email_message.to_addresses[0])
-        if not shield_info:
-            # Return a result that will cause 404
-            class NotFoundResult:
-                should_forward = False
-                toxicity_score = 0.0
-                processing_time_ms = 0
-                block_reason = "Shield address not found"
-                horsemen_detected = []
-            return NotFoundResult()
-        
-        # Process through protection feature
-        protection_result = await protection.process_email(
-            email_message,
-            user_email=shield_info.user_email,
-            organization_id=shield_info.organization_id
-        )
-        
-        # Convert to legacy format for compatibility
-        class LegacyCompatResult:
-            def __init__(self, result):
-                self.should_forward = result.should_forward
-                self.toxicity_score = result.analysis.toxicity_score if result.analysis else 0.0
-                self.processing_time_ms = result.analysis.processing_time_ms if result.analysis else 0
-                self.block_reason = result.block_reason
-                self.horsemen_detected = [h.horseman for h in (result.analysis.horsemen_detected if result.analysis else [])]
-        
-        return LegacyCompatResult(protection_result)
     
-    def _build_response(self, result: Any, message_id: str, user: Dict[str, Any]) -> Response:
-        """Build response based on processing result."""
-        user_id = str(self._get_user_field(user, "id"))
-        
-        base_response = {
-            "status": "accepted",
-            "message_id": message_id,
-            "user_id": user_id,
-            "toxicity_score": result.toxicity_score,
-            "processing_time_ms": result.processing_time_ms
-        }
-        
-        if result.should_forward:
-            return self._forward_response(base_response, user)
-        else:
-            return self._block_response(base_response, result)
-    
-    def _forward_response(self, base: Dict[str, Any], user: Dict[str, Any]) -> Response:
-        """Build response for forwarded email."""
-        user_email = self._get_user_field(user, "email")
-        logger.info(f"Email {base['message_id']} processed and forwarded to {user_email}")
-        
-        base["processing"] = "forwarded"
-        return Response(content=base, status_code=HTTP_200_OK)
-    
-    def _block_response(self, base: Dict[str, Any], result: Any) -> Response:
-        """Build response for blocked email."""
-        logger.info(f"Email {base['message_id']} blocked: {result.block_reason}")
-        
-        base.update({
-            "processing": "blocked",
-            "block_reason": result.block_reason,
-            "horsemen_detected": result.horsemen_detected
-        })
-        return Response(content=base, status_code=HTTP_200_OK)
     
     def _error_response(self, error: str, message_id: str, status: int = HTTP_400_BAD_REQUEST) -> Response:
         """Build error response."""
