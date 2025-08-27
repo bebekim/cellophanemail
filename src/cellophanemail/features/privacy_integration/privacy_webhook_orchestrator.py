@@ -1,12 +1,14 @@
 """
-PrivacyWebhookOrchestrator - Minimal implementation for TDD CYCLE 1 GREEN phase.
+PrivacyWebhookOrchestrator - Privacy-focused in-memory email processing.
 
+REFACTOR PHASE: Now inherits from BaseWebhookOrchestrator for better structure.
 This orchestrator coordinates in-memory email processing without database storage.
 """
 
 import logging
 from typing import Dict, Any
 
+from .orchestrator_interface import BaseWebhookOrchestrator
 from ...core.webhook_models import PostmarkWebhookPayload
 from ..email_protection.memory_manager import MemoryManager
 from ..email_protection.ephemeral_email import EphemeralEmail
@@ -14,7 +16,7 @@ from ..email_protection.ephemeral_email import EphemeralEmail
 logger = logging.getLogger(__name__)
 
 
-class PrivacyWebhookOrchestrator:
+class PrivacyWebhookOrchestrator(BaseWebhookOrchestrator):
     """
     Orchestrates webhook processing through privacy pipeline.
     
@@ -51,17 +53,18 @@ class PrivacyWebhookOrchestrator:
         
         if not stored:
             logger.warning(f"Failed to store email {webhook_payload.MessageID} - memory at capacity")
-            return {
-                "status": "rejected",
-                "message_id": webhook_payload.MessageID,
-                "reason": "memory_capacity_exceeded"
-            }
+            return self._create_response(
+                status="rejected",
+                message_id=webhook_payload.MessageID,
+                processing_type="privacy_pipeline_rejected",
+                reason="memory_capacity_exceeded"
+            )
         
         # Return 202 Accepted for async processing
         logger.info(f"Email {webhook_payload.MessageID} queued for async privacy processing")
         
-        return {
-            "status": "accepted",
-            "message_id": webhook_payload.MessageID,
-            "processing": "async_privacy_pipeline"
-        }
+        return self._create_response(
+            status="accepted",
+            message_id=webhook_payload.MessageID,
+            processing_type="async_privacy_pipeline"
+        )
