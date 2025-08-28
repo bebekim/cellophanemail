@@ -15,7 +15,8 @@ from cellophanemail.features.privacy_integration.privacy_webhook_orchestrator im
 from cellophanemail.features.email_protection.background_cleanup import BackgroundCleanupService
 from cellophanemail.features.email_protection.memory_manager import MemoryManager
 from cellophanemail.features.email_protection.storage import ProtectionLogStorage
-from cellophanemail.features.email_protection.immediate_delivery import DeliveryResult
+from cellophanemail.features.email_protection.integrated_delivery_manager import EnhancedDeliveryResult
+from cellophanemail.features.email_protection.in_memory_processor import ProtectionAction
 
 
 class TestEndToEndPrivacyValidation:
@@ -38,10 +39,6 @@ class TestEndToEndPrivacyValidation:
             HtmlBody="<p>Our Q4 revenue reached $2.5M with 15% growth. Keep this confidential until public announcement.</p>"
         )
         
-        # Create orchestrator and cleanup service
-        orchestrator = PrivacyWebhookOrchestrator()
-        cleanup_service = BackgroundCleanupService(orchestrator.memory_manager)
-        
         # Mock all external services to prevent real API calls
         # Create a mock LLM analyzer that can be used
         mock_llm_analyzer = Mock()
@@ -55,21 +52,23 @@ class TestEndToEndPrivacyValidation:
         }
         
         with patch('cellophanemail.features.email_protection.in_memory_processor.LlamaAnalyzer', return_value=mock_llm_analyzer), \
-             patch('cellophanemail.features.email_protection.immediate_delivery.ImmediateDeliveryManager.deliver_email') as mock_delivery, \
+             patch('cellophanemail.core.email_delivery.factory.EmailSenderFactory.create_sender') as mock_sender_factory, \
              patch('cellophanemail.features.email_protection.storage.ProtectionLogStorage.log_protection_decision') as mock_db_log:
             
-            # Configure delivery mock
-            mock_delivery.return_value = DeliveryResult(
-                success=True,
-                attempts=1,
-                delivery_time_ms=100
-            )
+            # Configure email sender mock
+            mock_sender = AsyncMock()
+            mock_sender.send_email.return_value = True  # Successful delivery
+            mock_sender_factory.return_value = mock_sender
+            
+            # Create orchestrator and cleanup service AFTER setting up mocks
+            orchestrator = PrivacyWebhookOrchestrator()
+            cleanup_service = BackgroundCleanupService(orchestrator.memory_manager)
             
             # Act - Process the email through complete pipeline
             result = await orchestrator.process_webhook(webhook_payload)
             
             # Allow async processing to complete
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.2)  # Increased wait time for delivery
             
             # Assert - Verify complete privacy flow
             
@@ -87,7 +86,7 @@ class TestEndToEndPrivacyValidation:
             # Note: LLM analysis may fall back to heuristics in test environment
             
             # 4. Email delivery was attempted
-            mock_delivery.assert_called_once()
+            mock_sender.send_email.assert_called_once()
             
             # 5. CRITICAL: Database logging should NOT have been called (privacy mode)
             # In privacy mode, we expect NO database logging at all
