@@ -53,7 +53,8 @@ class TestEmailCompositionStrategy:
             toxicity_score=0.15,
             processed_content="Meeting at 3pm tomorrow",
             requires_delivery=True,
-            delivery_targets=["user@example.com"]
+            delivery_targets=["user@example.com"],
+            processing_time_ms=150
         )
         
         config = DeliveryConfiguration(
@@ -97,7 +98,8 @@ class TestEmailCompositionStrategy:
             toxicity_score=0.65,
             processed_content="This message had [REDACTED] content",
             requires_delivery=True,
-            delivery_targets=["user@example.com"]
+            delivery_targets=["user@example.com"],
+            processing_time_ms=200
         )
         
         config = DeliveryConfiguration(
@@ -138,7 +140,8 @@ class TestEmailCompositionStrategy:
             toxicity_score=0.25,
             processed_content="Summary: Newsletter about product updates and company news.",
             requires_delivery=True,
-            delivery_targets=["user@example.com"]
+            delivery_targets=["user@example.com"],
+            processing_time_ms=300
         )
         
         config = DeliveryConfiguration(service_domain="cellophanemail.com")
@@ -174,7 +177,8 @@ class TestEmailCompositionStrategy:
             toxicity_score=0.45,
             processed_content="Click this link for updates",
             requires_delivery=True,
-            delivery_targets=["user@example.com"]
+            delivery_targets=["user@example.com"],
+            processing_time_ms=180
         )
         
         config = DeliveryConfiguration(service_domain="cellophanemail.com")
@@ -213,7 +217,8 @@ class TestEmailCompositionStrategy:
             toxicity_score=0.10,
             processed_content="Thanks for the update!",
             requires_delivery=True,
-            delivery_targets=["user@example.com"]
+            delivery_targets=["user@example.com"],
+            processing_time_ms=120
         )
         
         config = DeliveryConfiguration(
@@ -249,7 +254,8 @@ class TestEmailCompositionStrategy:
             toxicity_score=0.20,
             processed_content="Test content",
             requires_delivery=True,
-            delivery_targets=["user@example.com"]
+            delivery_targets=["user@example.com"],
+            processing_time_ms=100
         )
         
         # Test with transparency headers disabled
