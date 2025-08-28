@@ -211,11 +211,11 @@ class TestStreamlinedProcessor:
         assert thresholds['forward_context'] < thresholds['redact_harmful'] 
         assert thresholds['redact_harmful'] < thresholds['summarize_only']
         
-        # Verify reasonable ranges (updated for recalibrated thresholds)
-        assert 0.05 <= thresholds['forward_clean'] <= 0.15
-        assert 0.15 <= thresholds['forward_context'] <= 0.35
-        assert 0.35 <= thresholds['redact_harmful'] <= 0.65
-        assert 0.60 <= thresholds['summarize_only'] <= 0.85
+        # Verify reasonable ranges (updated for recalibrated thresholds - 2025-08-27)
+        assert 0.25 <= thresholds['forward_clean'] <= 0.35
+        assert 0.50 <= thresholds['forward_context'] <= 0.60
+        assert 0.65 <= thresholds['redact_harmful'] <= 0.75
+        assert 0.85 <= thresholds['summarize_only'] <= 0.95
         
         print(f"Empirical thresholds: {thresholds}")
     

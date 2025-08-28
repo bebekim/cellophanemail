@@ -4,12 +4,12 @@ TDD RED PHASE: Test for GraduatedDecisionMaker - sophisticated email protection 
 This test defines the expected behavior for a graduated decision system that provides
 nuanced protection actions beyond simple pass/block decisions.
 
-Expected Actions:
-- FORWARD_CLEAN: Safe content (toxicity < 0.2)
-- FORWARD_WITH_CONTEXT: Add helpful notes (0.2-0.35)  
-- REDACT_HARMFUL: Remove toxic parts (0.35-0.5)
-- SUMMARIZE_ONLY: Facts only (0.5-0.7)
-- BLOCK_ENTIRELY: Too toxic (> 0.7)
+Expected Actions (Updated 2025-08-27 - Recalibrated thresholds):
+- FORWARD_CLEAN: Safe content (toxicity < 0.30)
+- FORWARD_WITH_CONTEXT: Add helpful notes (0.30-0.55)  
+- REDACT_HARMFUL: Remove toxic parts (0.55-0.70)
+- SUMMARIZE_ONLY: Facts only (0.70-0.90)
+- BLOCK_ENTIRELY: Too toxic (> 0.90)
 
 This test SHOULD FAIL because GraduatedDecisionMaker doesn't exist yet.
 """
@@ -57,7 +57,7 @@ class TestGraduatedDecisionMaker:
         clean_analysis = AnalysisResult(
             safe=True,
             threat_level=ThreatLevel.SAFE,
-            toxicity_score=0.1,  # Below 0.2 threshold
+            toxicity_score=0.1,  # Below 0.30 threshold
             horsemen_detected=[],
             reasoning="Clean professional email",
             processing_time_ms=50,
@@ -77,12 +77,12 @@ class TestGraduatedDecisionMaker:
         """
         RED PHASE: Test that minor toxicity gets FORWARD_WITH_CONTEXT action.
         
-        Toxicity between 0.2-0.35 should add helpful context notes.
+        Toxicity between 0.30-0.55 should add helpful context notes.
         """
         minor_toxic_analysis = AnalysisResult(
             safe=False,
             threat_level=ThreatLevel.LOW,
-            toxicity_score=0.3,  # In 0.2-0.35 range
+            toxicity_score=0.40,  # In 0.30-0.55 range
             horsemen_detected=[
                 HorsemanDetection(
                     horseman="manipulation",
@@ -110,12 +110,12 @@ class TestGraduatedDecisionMaker:
         """
         RED PHASE: Test that moderate toxicity gets REDACT_HARMFUL action.
         
-        Toxicity between 0.35-0.5 should redact harmful parts.
+        Toxicity between 0.55-0.70 should redact harmful parts.
         """
         moderate_toxic_analysis = AnalysisResult(
             safe=False,
             threat_level=ThreatLevel.MEDIUM,
-            toxicity_score=0.45,  # In 0.35-0.5 range
+            toxicity_score=0.60,  # In 0.55-0.70 range
             horsemen_detected=[
                 HorsemanDetection(
                     horseman="harassment",
@@ -144,12 +144,12 @@ class TestGraduatedDecisionMaker:
         """
         RED PHASE: Test that high toxicity gets SUMMARIZE_ONLY action.
         
-        Toxicity between 0.5-0.7 should provide only factual summary.
+        Toxicity between 0.70-0.90 should provide only factual summary.
         """
         high_toxic_analysis = AnalysisResult(
             safe=False,
             threat_level=ThreatLevel.HIGH,
-            toxicity_score=0.6,  # In 0.5-0.7 range
+            toxicity_score=0.75,  # In 0.70-0.90 range
             horsemen_detected=[
                 HorsemanDetection(
                     horseman="harassment",
@@ -185,12 +185,12 @@ class TestGraduatedDecisionMaker:
         """
         RED PHASE: Test that extreme toxicity gets BLOCK_ENTIRELY action.
         
-        Toxicity > 0.7 should block the email entirely.
+        Toxicity > 0.90 should block the email entirely.
         """
         extreme_toxic_analysis = AnalysisResult(
             safe=False,
             threat_level=ThreatLevel.CRITICAL,
-            toxicity_score=0.8,  # Above 0.7 threshold
+            toxicity_score=0.95,  # Above 0.90 threshold
             horsemen_detected=[
                 HorsemanDetection(
                     horseman="harassment",
@@ -259,10 +259,11 @@ class TestGraduatedDecisionMaker:
         Ensures consistent behavior when toxicity equals threshold values.
         """
         test_cases = [
-            (0.2, ProtectionAction.FORWARD_WITH_CONTEXT),   # Exactly at threshold
-            (0.35, ProtectionAction.REDACT_HARMFUL),        # Exactly at threshold  
-            (0.5, ProtectionAction.SUMMARIZE_ONLY),         # Exactly at threshold
-            (0.7, ProtectionAction.BLOCK_ENTIRELY),         # Exactly at threshold
+            (0.20, ProtectionAction.FORWARD_CLEAN),         # Below first threshold
+            (0.30, ProtectionAction.FORWARD_WITH_CONTEXT),   # Exactly at threshold
+            (0.55, ProtectionAction.REDACT_HARMFUL),        # Exactly at threshold  
+            (0.70, ProtectionAction.SUMMARIZE_ONLY),         # Exactly at threshold
+            (0.90, ProtectionAction.BLOCK_ENTIRELY),         # Exactly at threshold
         ]
         
         for toxicity_score, expected_action in test_cases:
