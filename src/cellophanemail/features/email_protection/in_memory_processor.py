@@ -6,7 +6,8 @@ from typing import List, Optional
 
 from .ephemeral_email import EphemeralEmail
 from .graduated_decision_maker import ProtectionAction
-from .llama_analyzer import LlamaAnalyzer
+from .analyzer_interface import IEmailAnalyzer
+from .analyzer_factory import AnalyzerFactory
 from .contracts import EmailProcessorInterface
 
 logger = logging.getLogger(__name__)
@@ -49,26 +50,29 @@ class InMemoryProcessor(EmailProcessorInterface):
     once database storage dependencies are removed from that component.
     """
     
-    def __init__(self, temperature: float = 0.0, use_llm: bool = True):
+    def __init__(self, temperature: float = 0.0, use_llm: bool = True, analyzer: Optional[IEmailAnalyzer] = None):
         """
         Initialize InMemoryProcessor with specified analysis parameters.
         
         Args:
-            temperature: Analysis temperature (0.0 for deterministic results, 
-                        higher values for more varied analysis in production)
-            use_llm: Whether to use LlamaAnalyzer (True) or simple heuristics (False)
+            temperature: Analysis temperature (0.0 for deterministic results)
+            use_llm: Whether to use LLM analyzer (True) or simple heuristics (False)
+            analyzer: Optional analyzer to inject (for testing). If None, uses factory.
         """
         self.temperature = temperature
         self.use_llm = use_llm
         
-        # Initialize LLM analyzer if requested
-        if self.use_llm:
+        # Use injected analyzer or create via factory
+        if analyzer is not None:
+            self.llm_analyzer = analyzer
+            logger.info(f"Using injected analyzer: {type(analyzer).__name__}")
+        elif self.use_llm:
             try:
-                self.llm_analyzer = LlamaAnalyzer(temperature=temperature)
+                self.llm_analyzer = AnalyzerFactory.create_analyzer(temperature=temperature)
+                logger.info(f"Created analyzer via factory: {type(self.llm_analyzer).__name__}")
             except (ValueError, Exception) as e:
-                logger.warning(f"Failed to initialize LlamaAnalyzer: {e}. Falling back to heuristics.")
-                self.use_llm = False
-                self.llm_analyzer = None
+                logger.error(f"Failed to create analyzer: {e}. No fallback available.")
+                raise RuntimeError(f"LLM analyzer creation failed: {e}")
         else:
             self.llm_analyzer = None
         
@@ -96,11 +100,15 @@ class InMemoryProcessor(EmailProcessorInterface):
         content = email.get_content_for_analysis()
         
         if self.use_llm and self.llm_analyzer:
-            # Use LLM for analysis
-            llm_result = self.llm_analyzer.analyze_toxicity(content)
-            toxicity_score = llm_result.get('toxicity_score', 0.0)
+            # Use LLM for analysis - no fallback to heuristics
+            try:
+                analysis = self.llm_analyzer.analyze_email_toxicity(content, email.from_address)
+                toxicity_score = analysis.toxicity_score
+            except Exception as e:
+                logger.error(f"LLM analysis failed: {e}")
+                raise RuntimeError(f"Email analysis failed, no fallback available: {e}")
         else:
-            # Fall back to heuristics
+            # Only use heuristics if LLM is explicitly disabled
             toxicity_score = self._analyze_content_toxicity(content)
         
         # Graduated decision making using configured thresholds

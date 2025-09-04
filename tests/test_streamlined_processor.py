@@ -222,9 +222,14 @@ class TestStreamlinedProcessor:
     @pytest.mark.asyncio
     async def test_error_handling_and_fallback(self):
         """Test processor handles LLM failures gracefully."""
-        # Test with invalid LLM configuration
-        broken_analyzer = SimpleLLMAnalyzer(provider="invalid", client=None, model_name="nonexistent")
-        broken_processor = StreamlinedEmailProtectionProcessor(broken_analyzer)
+        # Create a mock analyzer that raises an exception
+        from unittest.mock import Mock
+        from src.cellophanemail.features.email_protection.analyzer_interface import IEmailAnalyzer
+        
+        broken_analyzer = Mock(spec=IEmailAnalyzer)
+        broken_analyzer.analyze_email_toxicity.side_effect = RuntimeError("Simulated LLM failure")
+        
+        broken_processor = StreamlinedEmailProtectionProcessor(analyzer=broken_analyzer)
         
         test_email = EmailMessage(
             message_id="test-error-handling",

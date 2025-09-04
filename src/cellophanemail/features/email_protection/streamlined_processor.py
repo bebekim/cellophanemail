@@ -8,7 +8,7 @@ Replaces the complex 4-phase pipeline with:
 4. Deterministic testing support
 
 Architecture:
-- ConsolidatedLLMAnalyzer: Single comprehensive analysis
+- EmailToxicityAnalyzer: Single comprehensive analysis
 - GraduatedDecisionMaker: Pure decision logic  
 - ProtectionLogStorage: Isolated side effects
 """
@@ -18,11 +18,11 @@ from typing import Optional
 from datetime import datetime
 
 from ...providers.contracts import EmailMessage
-from .consolidated_analyzer import ConsolidatedLLMAnalyzer, ConsolidatedAnalysis
+from .analyzer_interface import IEmailAnalyzer
+from .analyzer_factory import AnalyzerFactory  
 from .graduated_decision_maker import GraduatedDecisionMaker, ProtectionAction
 from .models import ProtectionResult, ThreatLevel
 from .storage import ProtectionLogStorage
-from .llm_analyzer import SimpleLLMAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -51,18 +51,24 @@ class StreamlinedEmailProtectionProcessor:
     """
     
     def __init__(self, 
-                 llm_analyzer: Optional[SimpleLLMAnalyzer] = None,
+                 analyzer: Optional[IEmailAnalyzer] = None,
                  temperature: float = 0.0,
                  thresholds: Optional[dict] = None):
         """
         Initialize streamlined processor.
         
         Args:
-            llm_analyzer: LLM client. If None, auto-creates from environment
+            analyzer: Email analyzer to inject. If None, uses factory to create one
             temperature: LLM temperature. Use 0.0 for deterministic testing
             thresholds: Custom decision thresholds. Uses empirical defaults if None
         """
-        self.analyzer = ConsolidatedLLMAnalyzer(llm_analyzer, temperature)
+        if analyzer is not None:
+            self.analyzer = analyzer
+            logger.info(f"Using injected analyzer: {type(analyzer).__name__}")
+        else:
+            self.analyzer = AnalyzerFactory.create_analyzer(temperature=temperature)
+            logger.info(f"Created analyzer via factory: {type(self.analyzer).__name__}")
+            
         self.decision_maker = GraduatedDecisionMaker(thresholds or EMPIRICAL_THRESHOLDS)
         self.storage = ProtectionLogStorage()
         
@@ -102,10 +108,28 @@ class StreamlinedEmailProtectionProcessor:
                 return self._create_quota_exceeded_result(email, organization_id)
         
         # Single comprehensive LLM analysis (replaces 6-call pipeline)
-        consolidated_analysis = await self.analyzer.analyze_email(content, email.from_address)
+        try:
+            consolidated_analysis = self.analyzer.analyze_email_toxicity(content, email.from_address)
+        except Exception as e:
+            logger.error(f"LLM analysis failed for {email.message_id}: {e}")
+            # Conservative fallback - assume medium toxicity to be safe
+            consolidated_analysis = self._create_fallback_analysis(content, str(e))
         
-        # Convert to legacy format for compatibility
-        legacy_analysis = self.analyzer.to_legacy_analysis_result(consolidated_analysis)
+        # Convert to legacy format for compatibility (if available)
+        if hasattr(self.analyzer, 'to_legacy_analysis_result'):
+            legacy_analysis = self.analyzer.to_legacy_analysis_result(consolidated_analysis)
+        else:
+            # Create legacy analysis from consolidated analysis for mock analyzers
+            from .models import AnalysisResult
+            legacy_analysis = AnalysisResult(
+                safe=consolidated_analysis.safe,
+                threat_level=consolidated_analysis.threat_level,
+                toxicity_score=consolidated_analysis.toxicity_score,
+                horsemen_detected=consolidated_analysis.horsemen_detected,
+                reasoning=consolidated_analysis.reasoning,
+                processing_time_ms=consolidated_analysis.processing_time_ms,
+                cached=False
+            )
         
         # Make graduated protection decision
         protection_decision = self.decision_maker.make_decision(legacy_analysis, content)
@@ -164,6 +188,28 @@ class StreamlinedEmailProtectionProcessor:
         """Check if organization is within email processing limits."""
         # TODO: Implement actual organization limit checking
         return True
+    
+    def _create_fallback_analysis(self, content: str, error_reason: str):
+        """Create conservative fallback analysis when LLM fails."""
+        from .mock_analyzer import EmailAnalysis
+        from .models import ThreatLevel
+        
+        # Conservative fallback - assume medium toxicity to trigger protection
+        return EmailAnalysis(
+            toxicity_score=0.6,  # Medium toxicity -> REDACT_HARMFUL
+            threat_level=ThreatLevel.MEDIUM,
+            safe=False,
+            fact_ratio=0.5,
+            communication_manner="unknown",
+            personal_attacks=[],
+            manipulation_tactics=[],
+            implicit_threats=[],
+            horsemen_detected=[],
+            reasoning=f"LLM analysis failed: {error_reason}. Using conservative fallback.",
+            confidence=0.3,
+            processing_time_ms=10,
+            language_detected="unknown"
+        )
     
     def _create_quota_exceeded_result(self, email: EmailMessage, organization_id: str) -> ProtectionResult:
         """Create result for quota exceeded scenario."""

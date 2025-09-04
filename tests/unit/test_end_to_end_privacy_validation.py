@@ -4,6 +4,7 @@ This should fail initially because complete integration flow needs validation
 """
 import pytest
 import asyncio
+import os
 import time
 import tempfile
 from datetime import datetime
@@ -40,18 +41,8 @@ class TestEndToEndPrivacyValidation:
         )
         
         # Mock all external services to prevent real API calls
-        # Create a mock LLM analyzer that can be used
-        mock_llm_analyzer = Mock()
-        mock_llm_analyzer.analyze_toxicity.return_value = {
-            "toxicity_score": 0.05,
-            "manipulation": False,
-            "gaslighting": False,
-            "stonewalling": False,
-            "defensive": False,
-            "action": "SAFE"
-        }
-        
-        with patch('cellophanemail.features.email_protection.in_memory_processor.LlamaAnalyzer', return_value=mock_llm_analyzer), \
+        # Use environment variable to make factory create mock analyzer
+        with patch.dict(os.environ, {'TESTING': 'true'}, clear=False), \
              patch('cellophanemail.core.email_delivery.factory.EmailSenderFactory.create_sender') as mock_sender_factory, \
              patch('cellophanemail.features.email_protection.storage.ProtectionLogStorage.log_protection_decision') as mock_db_log:
             
