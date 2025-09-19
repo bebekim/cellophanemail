@@ -34,11 +34,10 @@ class EmailLog(Table, tablename="email_logs"):
     organization = ForeignKey(Organization, null=False, index=True)
     user = ForeignKey(User, null=True, index=True)
     
-    # Email metadata
+    # Email metadata (no content stored)
     from_address = Varchar(length=500, null=False)
     to_addresses = JSON(null=False)  # List of recipient emails
-    subject = Text(null=True)
-    message_id = Varchar(length=500, null=True, index=True)
+    message_id = Varchar(length=500, null=True, index=True)  # External ID only
     
     # Processing results
     status = Varchar(
@@ -47,16 +46,13 @@ class EmailLog(Table, tablename="email_logs"):
         choices=EmailStatus
     )
     
-    # Four Horsemen analysis
-    ai_analysis = JSON(null=True)  # Full AI response
+    # Four Horsemen analysis (metadata only, no content)
     toxicity_score = Decimal(digits=(5, 2), null=True)  # 0.00 to 100.00
     horsemen_detected = JSON(default=[])  # List of detected patterns
-    blocked_content = Boolean(default=False)
+    blocked = Boolean(default=False)  # Whether email was blocked
     
-    # Content (compressed and with retention policy for cost optimization)
-    original_content = Text(null=True)  # Compressed in production
-    filtered_content = Text(null=True)  # Compressed in production
-    content_archived = Boolean(default=False)  # Moved to cheaper storage
+    # PRIVACY: No email content is ever stored in the database
+    # All processing happens in-memory with 5-minute TTL
     
     # Processing metadata
     processing_time_ms = Decimal(digits=(10, 2), null=True)

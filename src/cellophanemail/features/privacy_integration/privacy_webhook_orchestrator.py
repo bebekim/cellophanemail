@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from .orchestrator_interface import BaseWebhookOrchestrator
 from ...core.webhook_models import PostmarkWebhookPayload
-from ..email_protection.memory_manager import MemoryManager
+from ..email_protection.memory_manager_singleton import get_memory_manager
 from ..email_protection.ephemeral_email import EphemeralEmail
 from ..email_protection.in_memory_processor import InMemoryProcessor
 from ..email_protection.integrated_delivery_manager import IntegratedDeliveryManager
@@ -78,7 +78,7 @@ class PrivacyWebhookOrchestrator(BaseWebhookOrchestrator):
     def __init__(self, config: Optional[PrivacyProcessingConfig] = None):
         """Initialize with complete privacy processing pipeline."""
         self.config = config or PrivacyProcessingConfig()
-        self.memory_manager = MemoryManager()
+        self.memory_manager = get_memory_manager()  # Use shared singleton
         self.processor = InMemoryProcessor()
         
         # Initialize delivery manager with configuration

@@ -2,10 +2,11 @@
 
 import pytest
 import pytest_asyncio
+import secrets
 from cellophanemail.services.auth_service import (
-    hash_password, 
-    verify_password, 
-    generate_shield_username, 
+    hash_password,
+    verify_password,
+    generate_shield_username,
     generate_verification_token,
     validate_email_unique,
     create_user
@@ -103,11 +104,39 @@ class TestGenerateShieldUsername:
         """Test that different emails generate different usernames."""
         email1 = "user1@example.com"
         email2 = "user2@example.com"
-        
+
         result1 = generate_shield_username(email1)
         result2 = generate_shield_username(email2)
-        
+
         assert result1 != result2
+
+    def test_generate_shield_username_uses_secure_random(self):
+        """Test that generate_shield_username uses cryptographically secure random generation."""
+        with patch('cellophanemail.services.auth_service.secrets.randbelow') as mock_secrets:
+            mock_secrets.return_value = 500  # This will result in 600 (500 + 100)
+
+            email = "test@example.com"
+            username = generate_shield_username(email)
+
+            # Verify secrets.randbelow was called with correct parameter
+            mock_secrets.assert_called_once_with(900)
+
+            # Verify the username contains the expected number
+            assert "test600" == username
+
+    def test_generate_shield_username_secure_random_range(self):
+        """Test that secure random generation produces numbers in correct range."""
+        email = "test@example.com"
+
+        # Generate multiple usernames to check range
+        for _ in range(100):
+            username = generate_shield_username(email)
+            # Extract the number from the end
+            number_part = ''.join(filter(str.isdigit, username[-3:]))
+            number = int(number_part) if number_part else 0
+
+            # Should be in range 100-999
+            assert 100 <= number <= 999
 
 
 class TestGenerateVerificationToken:
