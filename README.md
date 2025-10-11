@@ -54,6 +54,272 @@ scripts/
 LICENSE.commercial          # Commercial license terms
 ```
 
+## 🚀 Quick Start & Application Entry Points
+
+### Prerequisites
+- Python 3.12+
+- Docker & Docker Compose (recommended) OR PostgreSQL installed locally
+- Redis (optional, for caching)
+
+### 🐳 Docker Setup (Recommended)
+
+Docker provides the easiest and most consistent development experience. All dependencies are containerized and configured automatically.
+
+#### Quick Start with Docker
+```bash
+# Clone the repository
+git clone git@github.com:cellophanemail/cellophanemail-internal.git
+cd cellophanemail-internal
+
+# Copy environment template and configure
+cp .env.docker .env
+# Edit .env and add your ANTHROPIC_API_KEY
+
+# Start everything (database, API, SMTP server)
+./bin/docker-dev
+```
+
+This automatically:
+- Builds Docker images with all dependencies
+- Starts PostgreSQL database on port 5433
+- Starts Litestar API on http://localhost:8000
+- Starts SMTP server on port 2525
+- Runs database migrations
+- Enables hot reload for code changes
+
+#### Docker Commands
+```bash
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# Clean everything (including database)
+./bin/docker-clean
+
+# Run tests
+docker-compose exec app pytest
+
+# Database shell
+docker-compose exec db psql -U cellophane_user -d cellophanemail
+
+# Python shell
+docker-compose exec app python
+```
+
+📖 **Full Docker documentation:** See [docker-commands.md](./docker-commands.md)
+
+---
+
+### 🐍 Native Python Setup (Alternative)
+
+If you prefer not to use Docker, you can run services directly with Python:
+
+#### Environment Setup
+```bash
+# Clone the repository
+git clone git@github.com:cellophanemail/cellophanemail-internal.git
+cd cellophanemail-internal
+
+# Install dependencies
+pip install -r requirements.txt
+# OR using uv (recommended)
+uv install
+
+# Copy and configure environment
+cp .env.example .env
+# Edit .env with your settings (database, API keys, etc.)
+```
+
+### Start the Application
+
+#### Quick Start (Recommended)
+```bash
+# Start full development environment (API + SMTP servers)
+./bin/dev-all
+```
+This starts:
+- **Web API** on http://localhost:8000 (Litestar application)
+- **SMTP Server** on localhost:2525 (Email processing)
+- **PostgreSQL** via Docker (if not running)
+- **Hot reloading** for development
+
+#### Individual Services
+```bash
+# Web API server only
+./bin/dev-litestar
+
+# SMTP email server only
+./bin/dev-smtp
+
+# Stop all running services
+./bin/kill
+```
+
+#### Manual Startup
+```bash
+# Direct uvicorn (production-like)
+PYTHONPATH=src uvicorn cellophanemail.app:app --host 0.0.0.0 --port 8000 --reload
+
+# Using Python directly
+PYTHONPATH=src python src/cellophanemail/app.py
+
+# Using Litestar CLI
+PYTHONPATH=src litestar --app cellophanemail.app:app run --reload
+```
+
+### Application Entry Points
+
+#### Primary Entry Points
+- **`src/cellophanemail/app.py`** - Main Litestar ASGI application
+- **`main.py`** - Root-level convenience entry point
+- **`src/cellophanemail/plugins/smtp/__main__.py`** - SMTP server entry point
+
+#### Development Scripts (`bin/` directory)
+- **`bin/dev-all`** - Start both API and SMTP servers
+- **`bin/dev-litestar`** - API server only
+- **`bin/dev-smtp`** - SMTP server only
+- **`bin/kill`** - Stop all services
+- **`bin/ngrok`** - Start ngrok tunnel for webhooks
+
+### Configuration
+
+#### Required Environment Variables
+```bash
+# Security (Required)
+SECRET_KEY=your-secret-key-minimum-32-characters
+ENCRYPTION_KEY=fernet-generated-encryption-key
+
+# Database (Required)
+DATABASE_URL=postgresql://user:password@localhost:5433/cellophanemail
+REDIS_URL=redis://localhost:6379/0
+
+# AI Services (Required)
+ANTHROPIC_API_KEY=sk-ant-api03-your-anthropic-key
+AI_PROVIDER=anthropic
+AI_MODEL=claude-3-5-sonnet-20241022
+
+# Email Delivery
+EMAIL_DELIVERY_METHOD=smtp  # or 'postmark'
+EMAIL_USERNAME=your-email@example.com
+EMAIL_PASSWORD=your-app-password
+SMTP_DOMAIN=cellophanemail.com
+```
+
+#### Generate Secure Keys
+```bash
+# Generate SECRET_KEY
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+
+# Generate ENCRYPTION_KEY
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+### Database Setup
+```bash
+# Start PostgreSQL (Docker)
+docker run --name cellophanemail-postgres \
+  -e POSTGRES_USER=cellophane_user \
+  -e POSTGRES_PASSWORD=secure_password \
+  -e POSTGRES_DB=cellophanemail \
+  -p 5433:5432 -d postgres:15
+
+# Run migrations
+PYTHONPATH=src uv run piccolo migrations forwards cellophanemail
+
+# Create new migration (if needed)
+PYTHONPATH=src uv run piccolo migrations new cellophanemail --auto
+```
+
+### Health Checks & Monitoring
+```bash
+# Application health
+curl http://localhost:8000/health/
+
+# Database readiness
+curl http://localhost:8000/health/ready
+
+# Memory status (email processing capacity)
+curl http://localhost:8000/health/memory
+
+# API documentation
+curl http://localhost:8000/schema
+```
+
+### Production Deployment
+
+#### Using Uvicorn (Recommended)
+```bash
+# Basic production
+uvicorn cellophanemail.app:app --host 0.0.0.0 --port 8000 --workers 4
+
+# With environment
+PYTHONPATH=src uvicorn cellophanemail.app:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+#### Systemd Service
+```ini
+[Unit]
+Description=CellophoneMail Application
+After=network.target
+
+[Service]
+Type=exec
+ExecStart=/opt/cellophanemail/.venv/bin/uvicorn cellophanemail.app:app --host 0.0.0.0 --port 8000
+WorkingDirectory=/opt/cellophanemail
+User=cellophanemail
+Restart=always
+Environment=PYTHONPATH=/opt/cellophanemail/src
+EnvironmentFile=/opt/cellophanemail/.env
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### Using Docker
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY src/ ./src/
+COPY .env .
+
+ENV PYTHONPATH=/app/src
+
+EXPOSE 8000
+CMD ["uvicorn", "cellophanemail.app:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### Architecture Overview
+
+#### Dual-Service Design
+- **Web API Server**: Litestar framework on port 8000 (webhooks, auth, frontend)
+- **SMTP Server**: aiosmtpd on port 2525 (direct email ingestion)
+- **Shared Memory**: Singleton memory manager for email processing coordination
+
+#### Application Factory Pattern
+```python
+# src/cellophanemail/app.py
+def create_app() -> Litestar:
+    """Application factory with dependency injection."""
+    settings = get_settings()
+    validate_configuration(settings)
+
+    # Plugin system, security middleware, background services
+    return Litestar(...)
+
+app = create_app()  # ASGI application instance
+```
+
+#### Privacy-First Architecture
+- **Zero Persistence**: Email content stored in memory only (5-minute TTL)
+- **Background Cleanup**: Scheduled service ensures memory limits
+- **Metadata Only**: No content logging, privacy-safe operation tracking
+
 ## 🛠️ Development Workflow
 
 ### Daily Development
@@ -63,6 +329,9 @@ Work normally in this monorepo - **everything in one place**:
 # Normal development workflow
 git clone git@github.com:cellophanemail/cellophanemail-internal.git
 cd cellophanemail-internal
+
+# Start development environment
+./bin/dev-all
 
 # Edit any feature - open source or commercial
 vim src/cellophanemail/providers/smtp/provider.py        # OSS
@@ -80,12 +349,41 @@ git push  # 🎉 Auto-syncs to both distribution repos
 
 ### Testing Strategy
 
-#### 1. Integration Testing (Internal)
+#### 1. Test Runner Scripts
+Use the comprehensive test runner for different testing modes:
+```bash
+# Run all tests (comprehensive)
+python scripts/run_tests.py all
+
+# Code functionality only (fast)
+python scripts/run_tests.py code
+
+# AI analysis quality only
+python scripts/run_tests.py analysis
+
+# AI-only tests (skip code tests)
+python scripts/run_tests.py ai-only
+
+# Compare analysis methods
+python scripts/run_tests.py compare
+```
+
+#### 2. Integration Testing (Internal)
 Test all features together in this monorepo:
 ```bash
 pytest tests/integration/        # Test everything together
 pytest tests/four_horsemen/      # Four Horsemen analysis quality
 pytest tests/unit/               # Fast unit tests
+
+# Security configuration tests
+pytest tests/unit/test_config_security.py -v
+
+# End-to-end testing
+python scripts/test_end_to_end.py
+
+# Email delivery testing
+python scripts/test_postmark_delivery.py
+python scripts/test_smtp_delivery.py
 ```
 
 #### 2. Distribution Testing
