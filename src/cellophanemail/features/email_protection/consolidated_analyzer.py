@@ -50,7 +50,7 @@ class ConsolidatedAnalysis:
     language_detected: str = "en"
 
 
-class ConsolidatedLLMAnalyzer:
+class EmailToxicityLLMAnalyzer:
     """
     Single-pass LLM analyzer for comprehensive email protection analysis.
     

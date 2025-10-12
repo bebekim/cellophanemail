@@ -4,7 +4,7 @@ from functools import lru_cache
 from typing import List
 import os
 
-from pydantic import Field
+from pydantic import Field, field_validator, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,18 +23,16 @@ class Settings(BaseSettings):
     host: str = Field(default="127.0.0.1", description="Host to bind to")
     port: int = Field(default=8000, description="Port to bind to")
     secret_key: str = Field(
-        default="dev-secret-key-change-in-production",
-        description="Secret key for JWT and sessions"
+        description="Secret key for JWT and sessions (min 32 chars, no defaults)"
     )
     encryption_key: str = Field(
         default="",
         description="Encryption key for sensitive data"
     )
     
-    # Database settings  
+    # Database settings
     database_url: str = Field(
-        default="postgresql://postgres:password@localhost:5432/cellophanemail",
-        description="Database URL for Piccolo ORM"
+        description="Database URL for Piccolo ORM (no default password allowed)"
     )
     database_echo: bool = Field(default=False, description="Echo SQL queries")
     
@@ -92,8 +90,54 @@ class Settings(BaseSettings):
     # SaaS settings
     stripe_api_key: str = Field(default="", description="Stripe API key")
     stripe_webhook_secret: str = Field(default="", description="Stripe webhook secret")
-    
-    
+
+    # Validation methods
+    @field_validator('secret_key')
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        """Validate secret key strength."""
+        if not v or len(v.strip()) == 0:
+            raise ValueError("SECRET_KEY is required and cannot be empty")
+        if len(v) < 32:
+            raise ValueError("SECRET_KEY must be at least 32 characters long")
+        if v == "dev-secret-key-change-in-production":
+            raise ValueError("Default SECRET_KEY is not allowed in any environment")
+        if v.lower() in ['secret', 'password', 'changeme', 'default']:
+            raise ValueError("SECRET_KEY is too weak - detected common weak value")
+        # Check for sufficient entropy (basic check)
+        if len(set(v)) < 8:
+            raise ValueError("SECRET_KEY should contain more character variety for security")
+        return v
+
+    @field_validator('database_url')
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        """Validate database URL doesn't contain default password."""
+        if not v or len(v.strip()) == 0:
+            raise ValueError("DATABASE_URL is required and cannot be empty")
+        if 'password@' in v.lower():
+            raise ValueError("DATABASE_URL cannot contain default 'password' - use a secure password")
+        if 'postgres:password' in v.lower():
+            raise ValueError("DATABASE_URL contains default postgres credentials - change password")
+        return v
+
+    @field_validator('anthropic_api_key')
+    @classmethod
+    def validate_anthropic_api_key(cls, v: str) -> str:
+        """Validate Anthropic API key format."""
+        if not v or len(v.strip()) == 0:
+            raise ValueError("ANTHROPIC_API_KEY is required for AI features")
+        if not v.startswith('sk-ant-api03-'):
+            raise ValueError("ANTHROPIC_API_KEY must be a valid Anthropic API key format")
+        if len(v) < 50:
+            raise ValueError("ANTHROPIC_API_KEY appears to be invalid (too short)")
+        return v
+
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production mode."""
+        return not self.debug and not self.testing
+
     @property
     def piccolo_config(self):
         """Piccolo ORM configuration."""

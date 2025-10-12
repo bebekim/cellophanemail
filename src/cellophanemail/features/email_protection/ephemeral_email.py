@@ -32,6 +32,11 @@ class EphemeralEmail:
     ttl_seconds: int = 300  # Default 5 minutes
     html_body: Optional[str] = None
     
+    # Email threading headers for conversation continuity
+    message_id_header: Optional[str] = None
+    in_reply_to: Optional[str] = None
+    references: Optional[str] = None
+    
     # Private field for TTL calculation
     _created_at: float = field(default_factory=time.time, init=False)
     

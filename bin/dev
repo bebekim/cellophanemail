@@ -1,8 +1,25 @@
 #!/bin/bash
 # Development environment startup script for CellophoneMail
 
+# Docker is now the recommended development method
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "💡 Docker is now the recommended development method!"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "🐳 To use Docker (recommended):"
+echo "   ./bin/docker-dev"
+echo ""
+echo "📖 See docker-commands.md for full documentation"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "⏳ Continuing with native Python setup in 3 seconds..."
+echo "   (Press Ctrl+C to cancel)"
+sleep 3
+echo ""
+
 export FLASK_ENV=development
-export DATABASE_URL=postgresql://cellophane_user:X1L0ouOWRM7DAVmGxDNWsHm2UDzCWgvW42k5l9OKzGU=@localhost:5433/cellophanemail
+# DATABASE_URL will be loaded from .env file
 
 echo "🚀 Starting CellophoneMail in DEVELOPMENT mode"
 echo "   Using .env configuration"
@@ -37,22 +54,29 @@ fi
 echo "🔍 Checking development user setup..."
 PYTHONPATH=src uv run python -c "
 import asyncio
+import secrets
+import string
 from cellophanemail.services.auth_service import validate_email_unique, create_user
 
 async def ensure_dev_user():
     dev_email = 'dev@cellophanemail.com'
     is_unique = await validate_email_unique(dev_email)
-    
+
     if is_unique:
+        # Generate a secure random password for development
+        chars = string.ascii_letters + string.digits + '!@#$%^&*'
+        dev_password = ''.join(secrets.choice(chars) for _ in range(16))
+
         user = await create_user(
             email=dev_email,
-            password='DevPass123!',
+            password=dev_password,
             first_name='Dev',
             last_name='User'
         )
         print(f'✅ Created development user: {dev_email}')
         print(f'   Shield address: {user.username}@cellophanemail.com')
-        print(f'   Password: DevPass123!')
+        print(f'   Password: {dev_password}')
+        print(f'   ⚠️  Save this password! It will be different on each run.')
     else:
         print(f'✅ Development user already exists: {dev_email}')
 

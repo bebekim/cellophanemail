@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    container_name: cellophanemail_db
+    environment:
+      POSTGRES_USER: cellophane_user
+      POSTGRES_PASSWORD: docker_dev_pass_2024
+      POSTGRES_DB: cellophanemail
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cellophanemail
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cellophane_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (Optional - use with --profile cache)
+  redis:
+    image: redis:7-alpine
+    container_name: cellophanemail_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - cellophanemail
+    profiles:
+      - cache
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Litestar API Server
+  app:
+    build: .
+    container_name: cellophanemail_app
+    environment:
+      - DEBUG=1
+      - DATABASE_URL=postgresql://cellophane_user:docker_dev_pass_2024@db:5432/cellophanemail
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - /app/src/cellophanemail.egg-info  # Prevent overwriting
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - cellophanemail
+    env_file:
+      - .env
+    command: ["uv", "run", "uvicorn", "cellophanemail.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # SMTP Email Server
+  smtp:
+    build: .
+    container_name: cellophanemail_smtp
+    environment:
+      - DEBUG=1
+      - SMTP_HOST=0.0.0.0
+      - SMTP_PORT=2525
+      - DATABASE_URL=postgresql://cellophane_user:docker_dev_pass_2024@db:5432/cellophanemail
+    ports:
+      - "2525:2525"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - cellophanemail
+    env_file:
+      - .env
+    command: ["uv", "run", "python", "-m", "cellophanemail.plugins.smtp"]
+
+volumes:
+  postgres_data:
+
+networks:
+  cellophanemail:
+    driver: bridge

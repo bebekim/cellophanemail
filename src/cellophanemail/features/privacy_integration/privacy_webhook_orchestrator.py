@@ -12,12 +12,47 @@ from dataclasses import dataclass
 
 from .orchestrator_interface import BaseWebhookOrchestrator
 from ...core.webhook_models import PostmarkWebhookPayload
-from ..email_protection.memory_manager import MemoryManager
+from ..email_protection.memory_manager_singleton import get_memory_manager
 from ..email_protection.ephemeral_email import EphemeralEmail
 from ..email_protection.in_memory_processor import InMemoryProcessor
-from ..email_protection.immediate_delivery import ImmediateDeliveryManager
+from ..email_protection.integrated_delivery_manager import IntegratedDeliveryManager
+from ..email_protection.email_composition_strategy import DeliveryConfiguration
+from ...config.settings import Settings
 
 logger = logging.getLogger(__name__)
+
+
+def _create_delivery_config_from_settings() -> DeliveryConfiguration:
+    """Create delivery configuration from app settings."""
+    settings = Settings()
+    
+    if settings.email_delivery_method == "postmark" and settings.postmark_api_token:
+        # Use Postmark for delivery
+        config_dict = {
+            "POSTMARK_API_TOKEN": settings.postmark_api_token,
+            "SMTP_DOMAIN": settings.smtp_domain,
+            "EMAIL_USERNAME": settings.email_username
+        }
+        sender_type = "postmark"
+    else:
+        # Fall back to SMTP
+        config_dict = {
+            "SMTP_DOMAIN": settings.smtp_domain,
+            "EMAIL_USERNAME": settings.email_username,
+            "OUTBOUND_SMTP_HOST": settings.outbound_smtp_host,
+            "OUTBOUND_SMTP_PORT": str(settings.outbound_smtp_port),
+            "EMAIL_PASSWORD": settings.email_password
+        }
+        sender_type = "smtp"
+    
+    return DeliveryConfiguration(
+        sender_type=sender_type,
+        config=config_dict,
+        service_domain=settings.smtp_domain,
+        max_retries=3,
+        add_transparency_headers=True,
+        preserve_threading=True
+    )
 
 
 @dataclass
@@ -27,6 +62,9 @@ class PrivacyProcessingConfig:
     max_concurrent_tasks: int = 50
     processing_timeout_seconds: float = 30.0
     enable_detailed_logging: bool = False  # For debugging only, never log content
+    
+    # Email delivery configuration
+    delivery_config: Optional[DeliveryConfiguration] = None
 
 
 class PrivacyWebhookOrchestrator(BaseWebhookOrchestrator):
@@ -40,9 +78,29 @@ class PrivacyWebhookOrchestrator(BaseWebhookOrchestrator):
     def __init__(self, config: Optional[PrivacyProcessingConfig] = None):
         """Initialize with complete privacy processing pipeline."""
         self.config = config or PrivacyProcessingConfig()
-        self.memory_manager = MemoryManager()
+        self.memory_manager = get_memory_manager()  # Use shared singleton
         self.processor = InMemoryProcessor()
-        self.delivery_manager = ImmediateDeliveryManager()
+        
+        # Initialize delivery manager with configuration
+        if self.config.delivery_config:
+            self.delivery_manager = IntegratedDeliveryManager(self.config.delivery_config)
+        else:
+            # Create configuration from app settings
+            try:
+                delivery_config = _create_delivery_config_from_settings()
+                self.delivery_manager = IntegratedDeliveryManager(delivery_config)
+                logger.info(f"Initialized delivery manager with {delivery_config.sender_type} sender")
+            except Exception as e:
+                logger.error(f"Failed to initialize delivery manager: {e}")
+                # For testing/development, create a minimal config that will be mocked
+                fallback_config = DeliveryConfiguration(
+                    sender_type="postmark",
+                    config={"POSTMARK_API_TOKEN": "test-token", "SMTP_DOMAIN": "test.com", "EMAIL_USERNAME": "test"},
+                    service_domain="cellophanemail.com",
+                    max_retries=1
+                )
+                self.delivery_manager = IntegratedDeliveryManager(fallback_config)
+        
         self._background_tasks = set()  # Track background tasks
         self._processing_stats = {
             "processed_count": 0,

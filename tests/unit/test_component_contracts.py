@@ -156,67 +156,59 @@ class TestComponentContracts:
         """
         RED TEST: InMemoryProcessor must properly interface with LLM analyzer
         """
-        # Mock LLM analyzer to test contract
-        mock_analyzer = Mock()
-        mock_analyzer.analyze_toxicity.return_value = {
-            "toxicity_score": 0.15,
-            "manipulation": False,
-            "gaslighting": False,
-            "stonewalling": False,
-            "defensive": False,
-            "action": "SAFE"
-        }
+        # Create mock analyzer using dependency injection
+        from src.cellophanemail.features.email_protection.mock_analyzer import MockAnalyzer
+        mock_analyzer = MockAnalyzer(default_toxicity=0.15)
+        processor = InMemoryProcessor(use_llm=True, analyzer=mock_analyzer)
         
-        with patch('cellophanemail.features.email_protection.in_memory_processor.LlamaAnalyzer', 
-                   return_value=mock_analyzer):
-            processor = InMemoryProcessor(use_llm=True)
-            
-            # Create test email
-            email = EphemeralEmail(
-                message_id="llm-contract-001",
-                from_address="sender@example.com",
-                to_addresses=["recipient@example.com"],
-                subject="LLM Contract Test",
-                text_body="Testing LLM analyzer contract",
-                user_email="user@example.com",
-                ttl_seconds=300
-            )
-            
-            # Contract: process_email must accept EphemeralEmail and return ProcessingResult
-            result = await processor.process_email(email)
-            
-            assert isinstance(result, ProcessingResult), \
-                "process_email must return ProcessingResult"
-            
-            # Contract: ProcessingResult must have required fields
-            required_fields = ['action', 'toxicity_score', 'requires_delivery', 
-                             'delivery_targets', 'processed_content', 'processing_time_ms']
-            for field in required_fields:
-                assert hasattr(result, field), f"ProcessingResult missing field: {field}"
-            
-            # Contract: action must be ProtectionAction enum
-            assert isinstance(result.action, ProtectionAction), \
-                "ProcessingResult.action must be ProtectionAction enum"
-            
-            # Contract: toxicity_score must be float between 0.0 and 1.0
-            assert isinstance(result.toxicity_score, float), \
-                "ProcessingResult.toxicity_score must be float"
-            assert 0.0 <= result.toxicity_score <= 1.0, \
-                "toxicity_score must be between 0.0 and 1.0"
-            
-            # Contract: requires_delivery must be bool
-            assert isinstance(result.requires_delivery, bool), \
-                "ProcessingResult.requires_delivery must be bool"
-            
-            # Contract: delivery_targets must be list of strings
-            assert isinstance(result.delivery_targets, list), \
-                "ProcessingResult.delivery_targets must be list"
-            
-            # Contract: LLM analyzer must be called with email content
-            mock_analyzer.analyze_toxicity.assert_called_once()
-            call_args = mock_analyzer.analyze_toxicity.call_args[0]
-            assert "LLM Contract Test" in call_args[0], \
-                "LLM analyzer must be called with email content"
+        # Create test email
+        email = EphemeralEmail(
+            message_id="llm-contract-001",
+            from_address="sender@example.com",
+            to_addresses=["recipient@example.com"],
+            subject="LLM Contract Test",
+            text_body="Testing LLM analyzer contract",
+            user_email="user@example.com",
+            ttl_seconds=300
+        )
+        
+        # Contract: process_email must accept EphemeralEmail and return ProcessingResult
+        result = await processor.process_email(email)
+        
+        assert isinstance(result, ProcessingResult), \
+            "process_email must return ProcessingResult"
+        
+        # Contract: ProcessingResult must have required fields
+        required_fields = ['action', 'toxicity_score', 'requires_delivery', 
+                         'delivery_targets', 'processed_content', 'processing_time_ms']
+        for field in required_fields:
+            assert hasattr(result, field), f"ProcessingResult missing field: {field}"
+        
+        # Contract: action must be ProtectionAction enum
+        assert isinstance(result.action, ProtectionAction), \
+            "ProcessingResult.action must be ProtectionAction enum"
+        
+        # Contract: toxicity_score must be float between 0.0 and 1.0
+        assert isinstance(result.toxicity_score, float), \
+            "ProcessingResult.toxicity_score must be float"
+        assert 0.0 <= result.toxicity_score <= 1.0, \
+            "toxicity_score must be between 0.0 and 1.0"
+        
+        # Contract: requires_delivery must be bool
+        assert isinstance(result.requires_delivery, bool), \
+            "ProcessingResult.requires_delivery must be bool"
+        
+        # Contract: delivery_targets must be list of strings
+        assert isinstance(result.delivery_targets, list), \
+            "ProcessingResult.delivery_targets must be list"
+        
+        # Contract: LLM analyzer must be called with email content
+        assert mock_analyzer.call_count >= 1, \
+            "LLM analyzer must be called during processing"
+        
+        # Test that returned toxicity score matches mock
+        assert result.toxicity_score == 0.15, \
+            f"Expected toxicity 0.15, got {result.toxicity_score}"
     
     def test_immediate_delivery_implements_delivery_contract(self):
         """

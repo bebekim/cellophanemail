@@ -1,0 +1,61 @@
+# Git
+.git
+.gitignore
+.github/
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.Python
+.venv
+venv/
+env/
+*.egg-info
+.pytest_cache
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+test_results/
+.hypothesis
+
+# Documentation
+*.md
+!README.md
+thoughts/
+
+# Secrets & Config
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+flask_session/
+
+# Build artifacts
+dist/
+build/
+*.egg-info
+
+# Tools & Scripts
+tools/
+scripts/
+demo_*.py
+bin/
+
+# Docker files themselves
+Dockerfile*
+docker-compose*.yml
+.dockerignore

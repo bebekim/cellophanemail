@@ -236,7 +236,11 @@ async def test_in_memory_processor_toxic_email():
     from src.cellophanemail.features.email_protection.ephemeral_email import EphemeralEmail
     from src.cellophanemail.features.email_protection.graduated_decision_maker import ProtectionAction
     
-    processor = InMemoryProcessor()
+    # Create mock analyzer with predictable response for toxic content
+    from src.cellophanemail.features.email_protection.mock_analyzer import create_toxic_analyzer
+    mock_analyzer = create_toxic_analyzer()
+    processor = InMemoryProcessor(analyzer=mock_analyzer)  # Inject mock
+    
     email = EphemeralEmail(
         message_id="toxic-1",
         from_address="sender@example.com",
@@ -249,10 +253,10 @@ async def test_in_memory_processor_toxic_email():
     
     result = await processor.process_email(email)
     
-    # Test toxic email behavior
-    assert result.action == ProtectionAction.BLOCK_ENTIRELY
-    assert result.toxicity_score > 0.90
-    assert result.requires_delivery == False
+    # Test toxic email behavior - mock analyzer matched "hate" first (0.95 toxicity)
+    assert result.action == ProtectionAction.BLOCK_ENTIRELY  # 0.95 toxicity 
+    assert result.toxicity_score == 0.95  # Predictable mock response
+    assert result.requires_delivery == False  # Blocked entirely
     assert result.delivery_targets == []
 
 

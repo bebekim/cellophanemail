@@ -1,8 +1,8 @@
 """Authentication service for user signup and login functionality."""
 
 import bcrypt
-import random
 import re
+import secrets
 import uuid
 from ..models.user import User
 
@@ -62,8 +62,8 @@ def generate_shield_username(email: str) -> str:
     if len(clean_name) > 10:
         clean_name = clean_name[:10]
     
-    # Generate random 3-digit number for uniqueness
-    random_number = random.randint(100, 999)
+    # Generate cryptographically secure random 3-digit number for uniqueness
+    random_number = secrets.randbelow(900) + 100  # Range: 100-999
     
     return f"{clean_name}{random_number}"
 

@@ -6,11 +6,12 @@ Splits monorepo into open source and commercial distributions.
 
 import os
 import sys
+import shlex
 import shutil
 import subprocess
 import argparse
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 
 
 class RepoSyncer:
@@ -73,16 +74,21 @@ class RepoSyncer:
         prefix = "🔍 DRY RUN" if self.dry_run else "🚀 EXEC"
         print(f"[{timestamp}] {prefix} {level}: {message}")
     
-    def run_command(self, cmd: str, cwd: Optional[Path] = None) -> bool:
-        """Run shell command with logging."""
-        self.log(f"Running: {cmd}")
+    def run_command(self, cmd: Union[str, List[str]], cwd: Optional[Path] = None) -> bool:
+        """Run shell command with logging (secure version)."""
+        # Convert string commands to lists for security
+        if isinstance(cmd, str):
+            cmd_list = shlex.split(cmd)
+        else:
+            cmd_list = cmd
+
+        self.log(f"Running: {' '.join(cmd_list)}")
         if self.dry_run:
             return True
-        
+
         try:
             result = subprocess.run(
-                cmd,
-                shell=True,
+                cmd_list,  # No shell=True - much safer
                 cwd=cwd or self.root_dir,
                 capture_output=True,
                 text=True,
@@ -341,22 +347,62 @@ Visit [cellophanemail.com/pricing](https://cellophanemail.com/pricing) to purcha
         
         return True
     
+    def validate_commit_message(self, message: str) -> str:
+        """Validate and sanitize commit message."""
+        # Remove dangerous shell characters
+        dangerous_chars = ['$', '`', '\\', '\n', '\r', ';', '&', '|', '>', '<']
+        sanitized = message
+        for char in dangerous_chars:
+            sanitized = sanitized.replace(char, '')
+
+        # Truncate to reasonable length
+        max_length = 200
+        if len(sanitized) > max_length:
+            sanitized = sanitized[:max_length] + "..."
+
+        # Ensure not empty after sanitization
+        if not sanitized.strip():
+            sanitized = "Repository sync"
+
+        return sanitized.strip()
+
     def commit_and_push(self, repo_path: str, message: str) -> bool:
         """Commit changes and push to remote."""
         repo_dir = Path(repo_path)
-        
+
         self.log(f"Committing changes in {repo_dir}")
-        
+
+        # Sanitize commit message
+        safe_message = self.validate_commit_message(message)
+
+        # Use secure command lists
         commands = [
-            "git add .",
-            f'git commit -m "{message}" || true',  # Don't fail if no changes
-            "git push origin main"
+            ["git", "add", "."],
+            ["git", "commit", "-m", safe_message],  # Safe: message as separate argument
+            ["git", "push", "origin", "main"]
         ]
-        
+
         for cmd in commands:
+            # Skip commit if no changes (check status first for commit command)
+            if cmd[0] == "git" and cmd[1] == "commit":
+                # Check if there are changes to commit
+                status_result = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    cwd=repo_dir,
+                    capture_output=True,
+                    text=True
+                )
+                if not status_result.stdout.strip():
+                    self.log("No changes to commit, skipping commit")
+                    continue
+
             if not self.run_command(cmd, repo_dir):
+                # Don't fail if commit has no changes
+                if cmd[0] == "git" and cmd[1] == "commit":
+                    self.log("Commit failed (likely no changes), continuing")
+                    continue
                 return False
-        
+
         return True
 
 
