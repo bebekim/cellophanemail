@@ -37,6 +37,7 @@ dependencies = [
     "aiohttp>=3.12.15",
     "ollama>=0.5.3",
     "llama-cpp-python>=0.3.2",
+    "httpcore>=1.0.9",
 ]
 
 [project.optional-dependencies]

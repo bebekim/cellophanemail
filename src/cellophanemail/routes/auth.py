@@ -13,6 +13,7 @@ from ..services.auth_service import (
     create_user,
     verify_password
 )
+from ..services.stripe_service import StripeService
 from ..config.settings import get_settings
 from ..middleware.jwt_auth import jwt_auth_required
 
@@ -176,20 +177,32 @@ class AuthController(Controller):
                 first_name=data.first_name,
                 last_name=data.last_name
             )
-            
+
+            # Create Stripe customer
+            stripe_service = StripeService()
+            customer = await stripe_service.create_customer(
+                user_id=str(user.id),
+                email=user.email,
+                name=f"{user.first_name or ''} {user.last_name or ''}".strip()
+            )
+
+            # Store customer ID
+            user.stripe_customer_id = customer.id
+            await user.save()
+
             # TODO: Send welcome/verification email via Postmark
             # TODO: Generate JWT token for auto-login
-            # TODO: Create Stripe checkout session for trial
-            
+
             return Response(
                 content={
                     "status": "registered",
                     "user_id": str(user.id),
                     "email": user.email,
                     "shield_address": f"{user.username}@cellophanemail.com",
+                    "stripe_customer_id": customer.id,
                     "email_verified": user.is_verified,
                     "verification_token": user.verification_token,
-                    "message": "Registration successful. Please check your email to verify your account."
+                    "message": "Registration successful. Use /billing/create-checkout to start your subscription."
                 },
                 status_code=HTTP_201_CREATED
             )
