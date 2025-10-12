@@ -515,6 +515,20 @@
 
 * FUTURE PHASES 🔮
 
+** TODO Docker Environment Validation Tests
+   - [ ] Create tests/docker/test_docker_environment.py
+   - [ ] Add test_docker_compose_config_valid() - Validate docker-compose.yml syntax
+   - [ ] Add test_dockerfile_builds() - Verify Dockerfile builds without errors
+   - [ ] Add test_services_start() - All services (db, app, smtp) start successfully
+   - [ ] Add test_health_endpoints() - Health check endpoints respond correctly
+   - [ ] Add test_hot_reload_works() - Code changes trigger automatic reload
+   - [ ] Add test_database_persistence() - Database data persists across container restarts
+   - [ ] Configure CI/CD to run Docker tests (requires Docker in CI environment)
+
+   **Context:** Core Docker implementation complete and merged to main.
+   These tests would provide automated regression detection for Docker setup.
+   See: thoughts/shared/plans/2025-10-11-docker-development-environment.md:954-1069
+
 ** TODO Decision Threshold Calibration
    - [ ] Analyze current threshold accuracy (0.218-0.322 range issues)
    - [ ] Test with diverse email samples for optimal boundaries
