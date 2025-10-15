@@ -43,10 +43,17 @@ class Settings(BaseSettings):
     )
     
     # CORS settings
-    cors_allowed_origins: List[str] = Field(
-        default=["http://localhost:3000", "https://cellophanemail.com"],
-        description="Allowed CORS origins"
+    cors_allowed_origins: str = Field(
+        default="http://localhost:3000,https://cellophanemail.com",
+        description="Allowed CORS origins (comma-separated)"
     )
+
+    @property
+    def cors_allowed_origins_list(self) -> List[str]:
+        """Parse CORS origins from comma-separated string."""
+        if isinstance(self.cors_allowed_origins, str):
+            return [origin.strip() for origin in self.cors_allowed_origins.split(',')]
+        return self.cors_allowed_origins
     
     # AI Service settings (preserve from protectedtex)
     anthropic_api_key: str = Field(description="Anthropic API key")
@@ -80,16 +87,29 @@ class Settings(BaseSettings):
     postmark_server_id: str = Field(default="", description="Postmark Server ID")
     postmark_account_api_token: str = Field(default="", description="Postmark Account API token")
     postmark_from_email: str = Field(default="", description="Default from email for Postmark")
+    postmark_from_address: str = Field(default="", description="Default from address for Postmark (alias for from_email)")
+    postmark_dry_run: bool = Field(default=False, description="Enable Postmark dry-run mode")
     
     # Plugin settings
-    enabled_plugins: List[str] = Field(
-        default=["smtp", "postmark"], 
-        description="Enabled email input plugins"
+    enabled_plugins: str = Field(
+        default="smtp,postmark",
+        description="Enabled email input plugins (comma-separated)"
     )
+
+    @property
+    def enabled_plugins_list(self) -> List[str]:
+        """Parse enabled plugins from comma-separated string."""
+        if isinstance(self.enabled_plugins, str):
+            return [plugin.strip() for plugin in self.enabled_plugins.split(',') if plugin.strip()]
+        return self.enabled_plugins
     
     # SaaS settings
     stripe_api_key: str = Field(default="", description="Stripe API key")
     stripe_webhook_secret: str = Field(default="", description="Stripe webhook secret")
+
+    # Feature flags
+    privacy_safe_logging: bool = Field(default=True, description="Enable privacy-safe logging mode")
+    llm_analyzer_mode: str = Field(default="privacy", description="LLM analyzer mode (privacy/standard)")
 
     # Validation methods
     @field_validator('secret_key')

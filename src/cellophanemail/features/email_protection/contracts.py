@@ -468,7 +468,8 @@ def create_contract_factory():
     try:
         from .llama_analyzer import LlamaAnalyzer
         registry.register_llm_analyzer("default", LlamaAnalyzer)
-    except ImportError:
+    except (ImportError, RuntimeError):
+        # RuntimeError for llama-cpp-python library loading issues (e.g., macOS compatibility)
         pass
     
     return registry

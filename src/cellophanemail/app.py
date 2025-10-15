@@ -118,7 +118,7 @@ def create_app() -> Litestar:
     
     # SaaS configuration
     cors_config = CORSConfig(
-        allow_origins=settings.cors_allowed_origins,
+        allow_origins=settings.cors_allowed_origins_list,
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
         allow_headers=["*"],
         allow_credentials=True,
