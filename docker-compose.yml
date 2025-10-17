@@ -80,6 +80,12 @@ services:
     env_file:
       - .env
     command: ["uv", "run", "python", "-m", "cellophanemail.plugins.smtp"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s = socket.socket(); s.connect(('localhost', 2525)); s.close()\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   postgres_data:
