@@ -307,6 +307,7 @@ dependencies = [
     { name = "celery" },
     { name = "cryptography" },
     { name = "email-validator" },
+    { name = "httpcore" },
     { name = "httpx" },
     { name = "jinja2" },
     { name = "litestar", extra = ["standard"] },
@@ -351,6 +352,7 @@ requires-dist = [
     { name = "celery", specifier = ">=5.3.4" },
     { name = "cryptography", specifier = ">=45.0.6" },
     { name = "email-validator", specifier = ">=2.2.0" },
+    { name = "httpcore", specifier = ">=1.0.9" },
     { name = "httpx", specifier = ">=0.26.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "litestar", extras = ["standard"], specifier = ">=2.16.0" },
@@ -1033,26 +1035,14 @@ wheels = [
 [[package]]
 name = "llama-cpp-python"
 version = "0.3.2"
-source = { registry = "https://abetlen.github.io/llama-cpp-python/whl/cpu" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "diskcache" },
     { name = "jinja2" },
     { name = "numpy" },
     { name = "typing-extensions" },
 ]
-wheels = [
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2/llama_cpp_python-0.3.2-cp312-cp312-linux_aarch64.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2/llama_cpp_python-0.3.2-cp312-cp312-linux_i686.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2/llama_cpp_python-0.3.2-cp312-cp312-linux_x86_64.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2/llama_cpp_python-0.3.2-cp312-cp312-macosx_10_13_x86_64.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2/llama_cpp_python-0.3.2-cp312-cp312-win32.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2/llama_cpp_python-0.3.2-cp312-cp312-win_amd64.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2/llama_cpp_python-0.3.2-cp313-cp313-linux_i686.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2/llama_cpp_python-0.3.2-cp313-cp313-linux_x86_64.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2/llama_cpp_python-0.3.2-cp313-cp313-macosx_10_13_x86_64.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2/llama_cpp_python-0.3.2-cp313-cp313-win32.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2/llama_cpp_python-0.3.2-cp313-cp313-win_amd64.whl" },
-]
+sdist = { url = "https://files.pythonhosted.org/packages/5f/0e/ff129005a33b955088fc7e4ecb57e5500b604fb97eca55ce8688dbe59680/llama_cpp_python-0.3.2.tar.gz", hash = "sha256:8fbf246a55a999f45015ed0d48f91b4ae04ae959827fac1cd6ac6ec65aed2e2f", size = 64964148 }
 
 [[package]]
 name = "markdown-it-py"
