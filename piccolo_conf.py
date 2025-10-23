@@ -5,21 +5,25 @@ from piccolo.engine.postgres import PostgresEngine
 from piccolo.engine.sqlite import SQLiteEngine
 import os
 
-# Get database URL from settings or environment
-try:
-    from cellophanemail.config.settings import get_settings
-    settings = get_settings()
-    database_url = settings.database_url
-except:
-    # Fallback to environment variable
-    database_url = os.environ.get("DATABASE_URL", "postgresql://postgres:password@localhost:5432/cellophanemail")
+# Priority: Environment variable first (for Docker/Railway), then settings
+database_url = os.environ.get("DATABASE_URL")
+
+if not database_url:
+    # Fallback to settings if DATABASE_URL not in environment
+    try:
+        from cellophanemail.config.settings import get_settings
+        settings = get_settings()
+        database_url = settings.database_url
+    except Exception:
+        # Final fallback
+        database_url = "postgresql://postgres:password@localhost:5432/cellophanemail"
 
 if database_url.startswith("postgresql"):
     # Parse PostgreSQL connection
     # postgresql://user:pass@host:port/db -> PostgresEngine config
     if "+asyncpg" in database_url:
         database_url = database_url.replace("+asyncpg", "")
-    
+
     # Extract components
     import re
     match = re.match(r"postgresql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)", database_url)
