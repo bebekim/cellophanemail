@@ -43,4 +43,5 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health/ || exit 1
 
 # Default command (Litestar API)
-CMD ["uvicorn", "cellophanemail.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Use 'uv run' to activate virtual environment for Railway deployment
+CMD ["uv", "run", "uvicorn", "cellophanemail.app:app", "--host", "0.0.0.0", "--port", "8000"]
