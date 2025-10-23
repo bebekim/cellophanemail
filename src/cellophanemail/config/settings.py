@@ -69,8 +69,8 @@ class Settings(BaseSettings):
     smtp_host: str = Field(default="smtp.gmail.com", description="SMTP host")
     smtp_port: int = Field(default=587, description="SMTP port")
     smtp_use_tls: bool = Field(default=True, description="Use TLS for SMTP")
-    email_username: str = Field(description="Email username")
-    email_password: str = Field(description="Email password")
+    email_username: str = Field(default="", description="Email username (only required for SMTP)")
+    email_password: str = Field(default="", description="Email password (only required for SMTP)")
     smtp_domain: str = Field(default="cellophanemail.com", description="Service domain for email")
     
     # Outbound email delivery settings
