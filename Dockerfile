@@ -44,5 +44,5 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=40s --retries=3 \
 
 # Default command (Litestar API)
 # Use 'uv run' to activate virtual environment for Railway deployment
-# Shell form allows Railway's $PORT environment variable to be expanded
-CMD uv run uvicorn cellophanemail.app:app --host 0.0.0.0 --port ${PORT:-8000}
+# Explicitly invoke shell to ensure $PORT environment variable is expanded
+CMD ["/bin/sh", "-c", "uv run uvicorn cellophanemail.app:app --host 0.0.0.0 --port ${PORT:-8000}"]
