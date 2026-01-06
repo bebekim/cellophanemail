@@ -13,12 +13,14 @@ This reduces 6 API calls to 1, improves performance 5-10x, and provides more con
 
 import json
 import logging
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+# Import core types from portable analysis_engine
+from analysis_engine import AnalysisResult, HorsemanDetection, ThreatLevel
 
 from .llm_analyzer import SimpleLLMAnalyzer
-from .models import AnalysisResult, ThreatLevel, HorsemanDetection
 
 logger = logging.getLogger(__name__)
 

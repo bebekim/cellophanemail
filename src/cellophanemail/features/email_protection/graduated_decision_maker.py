@@ -1,34 +1,34 @@
 """
 Graduated Decision Maker for sophisticated email protection decisions.
 
-Provides nuanced actions beyond simple pass/block:
-- FORWARD_CLEAN: Safe content (toxicity < 0.2)
-- FORWARD_WITH_CONTEXT: Add helpful notes (0.2-0.35)
-- REDACT_HARMFUL: Remove toxic parts (0.35-0.5) 
-- SUMMARIZE_ONLY: Facts only (0.5-0.7)
-- BLOCK_ENTIRELY: Too toxic (> 0.7)
+Uses analysis_engine for core scoring logic, adds cellophanemail-specific
+content processing (redaction, summarization, context notes).
+
+Actions (thresholds from analysis_engine.DEFAULT_THRESHOLDS):
+- FORWARD_CLEAN: Safe content (toxicity < 0.30)
+- FORWARD_WITH_CONTEXT: Add helpful notes (0.30-0.55)
+- REDACT_HARMFUL: Remove toxic parts (0.55-0.70)
+- SUMMARIZE_ONLY: Facts only (0.70-0.90)
+- BLOCK_ENTIRELY: Too toxic (> 0.90)
 """
 
 import re
 from dataclasses import dataclass
-from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Dict, Optional
 
-from .models import AnalysisResult
-
-
-class ProtectionAction(Enum):
-    """Available protection actions for emails."""
-    FORWARD_CLEAN = "forward_clean"
-    FORWARD_WITH_CONTEXT = "forward_with_context"
-    REDACT_HARMFUL = "redact_harmful"
-    SUMMARIZE_ONLY = "summarize_only"
-    BLOCK_ENTIRELY = "block_entirely"
+# Import core types from portable analysis_engine
+from analysis_engine import (
+    ProtectionAction,
+    DEFAULT_THRESHOLDS,
+    decide_action,
+    AnalysisResult,
+)
 
 
 @dataclass
 class ProtectionDecision:
     """Decision made by the graduated decision maker."""
+
     action: ProtectionAction
     processed_content: str
     reasoning: str
@@ -39,50 +39,43 @@ class ProtectionDecision:
 class GraduatedDecisionMaker:
     """
     Makes graduated protection decisions based on toxicity levels.
-    
-    Uses configurable thresholds to determine appropriate action levels.
+
+    Uses analysis_engine.decide_action() for core decision logic,
+    adds cellophanemail-specific content processing.
     """
-    
+
     def __init__(self, thresholds: Optional[Dict[str, float]] = None):
         """
         Initialize with configurable thresholds.
-        
+
         Args:
-            thresholds: Custom threshold values for decision boundaries
+            thresholds: Custom threshold values (overrides DEFAULT_THRESHOLDS)
         """
-        # Default thresholds - recalibrated 2025-08-23 based on real LLM scoring patterns
-        self.thresholds = {
-            'forward_clean': 0.30,      # Clean emails typically score 0.01-0.20
-            'forward_context': 0.55,    # Minor toxicity emails score 0.35-0.50
-            'redact_harmful': 0.70,     # Moderate toxicity emails score around 0.65
-            'summarize_only': 0.90      # High toxicity emails score 0.75-0.85
-        }
-        
-        # Override with custom thresholds if provided
-        if thresholds:
-            self.thresholds.update(thresholds)
+        # Use analysis_engine defaults, allow overrides
+        self.thresholds = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
     
     def make_decision(self, analysis: AnalysisResult, original_content: str) -> ProtectionDecision:
         """
         Make a graduated protection decision based on analysis results.
-        
+
         Args:
             analysis: The analysis result with toxicity score
             original_content: The original email content
-            
+
         Returns:
             ProtectionDecision with action and processed content
         """
         toxicity = analysis.toxicity_score
-        
-        # Determine action based on toxicity thresholds
-        if toxicity < self.thresholds['forward_clean']:
-            action = ProtectionAction.FORWARD_CLEAN
+
+        # Use analysis_engine's decide_action for core logic
+        action = decide_action(toxicity, self.thresholds)
+
+        # Apply cellophanemail-specific content processing based on action
+        if action == ProtectionAction.FORWARD_CLEAN:
             processed_content = original_content
             reasoning = f"Clean content (toxicity: {toxicity:.3f})"
-            
-        elif toxicity < self.thresholds['forward_context']:
-            action = ProtectionAction.FORWARD_WITH_CONTEXT
+
+        elif action == ProtectionAction.FORWARD_WITH_CONTEXT:
             processed_content = self._add_context_notes(original_content, analysis)
             # Include specific horsemen in reasoning if detected
             horsemen_names = [h.horseman for h in analysis.horsemen_detected] if analysis.horsemen_detected else []
@@ -90,28 +83,25 @@ class GraduatedDecisionMaker:
                 reasoning = f"Minor toxicity with {', '.join(horsemen_names)} detected (toxicity: {toxicity:.3f}) - adding context"
             else:
                 reasoning = f"Minor toxicity detected (toxicity: {toxicity:.3f}) - adding context"
-            
-        elif toxicity < self.thresholds['redact_harmful']:
-            action = ProtectionAction.REDACT_HARMFUL
+
+        elif action == ProtectionAction.REDACT_HARMFUL:
             processed_content = self._redact_harmful_content(original_content, analysis)
             reasoning = f"Moderate toxicity (toxicity: {toxicity:.3f}) - redacting harmful content"
-            
-        elif toxicity < self.thresholds['summarize_only']:
-            action = ProtectionAction.SUMMARIZE_ONLY
+
+        elif action == ProtectionAction.SUMMARIZE_ONLY:
             processed_content = self._create_summary(original_content, analysis)
             reasoning = f"High toxicity (toxicity: {toxicity:.3f}) - providing factual summary only"
-            
-        else:
-            action = ProtectionAction.BLOCK_ENTIRELY
+
+        else:  # BLOCK_ENTIRELY
             processed_content = ""
             reasoning = f"Extreme toxicity (toxicity: {toxicity:.3f}) - blocking entirely"
-        
+
         return ProtectionDecision(
             action=action,
             processed_content=processed_content,
             reasoning=reasoning,
             toxicity_score=toxicity,
-            original_analysis=analysis
+            original_analysis=analysis,
         )
     
     def _add_context_notes(self, content: str, analysis: AnalysisResult) -> str:

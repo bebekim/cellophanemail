@@ -1,47 +1,34 @@
-"""Models for email protection feature."""
+"""Models for email protection feature.
+
+Re-exports core types from analysis_engine for backwards compatibility.
+Extended ProtectionResult with cellophanemail-specific fields.
+"""
 
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from datetime import datetime
-from enum import Enum
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+# Re-export core types from portable analysis_engine
+from analysis_engine import (
+    ThreatLevel,
+    HorsemanDetection,
+    AnalysisResult,
+)
 
 if TYPE_CHECKING:
     from .graduated_decision_maker import ProtectionAction
 
-
-class ThreatLevel(Enum):
-    """Email threat level classification."""
-    SAFE = "safe"
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
-@dataclass
-class HorsemanDetection:
-    """Detection of a specific horseman."""
-    horseman: str  # harassment, deception, exploitation, manipulation
-    confidence: float  # 0.0 to 1.0
-    indicators: List[str]  # Specific indicators found
-    severity: str  # low, medium, high
-
-
-@dataclass
-class AnalysisResult:
-    """Result of Four Horsemen analysis."""
-    safe: bool
-    threat_level: ThreatLevel
-    toxicity_score: float  # 0.0 to 1.0
-    horsemen_detected: List[HorsemanDetection]
-    reasoning: str
-    processing_time_ms: int
-    cached: bool = False
+# Note: We keep ProtectionResult as a dataclass here because it has
+# cellophanemail-specific fields (forwarded_to, logged_at, to_dict)
+# that don't belong in the portable analysis_engine package.
 
 
 @dataclass
 class ProtectionResult:
-    """Final result of email protection processing."""
+    """Final result of email protection processing.
+
+    Extended version with cellophanemail-specific fields.
+    """
     should_forward: bool
     analysis: Optional[AnalysisResult]
     block_reason: Optional[str]
@@ -52,7 +39,7 @@ class ProtectionResult:
     protection_action: Optional['ProtectionAction'] = None
     processed_content: Optional[str] = None
     decision_reasoning: Optional[str] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for API responses."""
         return {
@@ -71,3 +58,12 @@ class ProtectionResult:
             "processed_content": self.processed_content,
             "decision_reasoning": self.decision_reasoning
         }
+
+
+# Re-export for backwards compatibility
+__all__ = [
+    "ThreatLevel",
+    "HorsemanDetection",
+    "AnalysisResult",
+    "ProtectionResult",
+]
