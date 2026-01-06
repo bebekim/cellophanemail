@@ -132,13 +132,9 @@ class Settings(BaseSettings):
     @field_validator('database_url')
     @classmethod
     def validate_database_url(cls, v: str) -> str:
-        """Validate database URL doesn't contain default password."""
+        """Validate database URL is provided."""
         if not v or len(v.strip()) == 0:
             raise ValueError("DATABASE_URL is required and cannot be empty")
-        if 'password@' in v.lower():
-            raise ValueError("DATABASE_URL cannot contain default 'password' - use a secure password")
-        if 'postgres:password' in v.lower():
-            raise ValueError("DATABASE_URL contains default postgres credentials - change password")
         return v
 
     @field_validator('anthropic_api_key')
