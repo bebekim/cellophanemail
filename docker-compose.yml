@@ -1,7 +1,7 @@
 services:
   # PostgreSQL Database
   db:
-    image: postgres:15
+    image: postgres:15-alpine
     container_name: cellophanemail_db
     environment:
       POSTGRES_USER: cellophane_user
