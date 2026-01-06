@@ -65,48 +65,90 @@ LICENSE.commercial          # Commercial license terms
 
 Docker provides the easiest and most consistent development experience. All dependencies are containerized and configured automatically.
 
+#### Docker Services
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| `db` | 5433:5432 | PostgreSQL 15 database |
+| `migrate` | - | Runs Piccolo migrations on startup |
+| `app` | 8000 | Litestar API server (hot reload enabled) |
+| `smtp` | 2525 | SMTP email server |
+| `redis` | 6379 | Optional cache (use `--profile cache`) |
+
 #### Quick Start with Docker
 ```bash
 # Clone the repository
 git clone git@github.com:cellophanemail/cellophanemail-internal.git
 cd cellophanemail-internal
 
-# Copy environment template and configure
-cp .env.docker .env
-# Edit .env and add your ANTHROPIC_API_KEY
+# Edit .env.docker and add your ANTHROPIC_API_KEY
+vim .env.docker
 
-# Start everything (database, API, SMTP server)
-./bin/docker-dev
+# Start all services (db → migrate → app + smtp)
+docker compose up --build
+
+# Or with Redis cache
+docker compose --profile cache up --build
+
+# Run in background
+docker compose up -d
 ```
 
 This automatically:
 - Builds Docker images with all dependencies
 - Starts PostgreSQL database on port 5433
+- **Runs database migrations automatically** before starting the app
 - Starts Litestar API on http://localhost:8000
 - Starts SMTP server on port 2525
-- Runs database migrations
 - Enables hot reload for code changes
 
 #### Docker Commands
 ```bash
 # View logs
-docker-compose logs -f
+docker compose logs -f
+
+# View specific service logs
+docker compose logs -f app
 
 # Stop services
-docker-compose down
+docker compose down
 
-# Clean everything (including database)
-./bin/docker-clean
+# Stop and remove volumes (clean database)
+docker compose down -v
+
+# Rebuild after code changes
+docker compose up --build
 
 # Run tests
-docker-compose exec app pytest
+docker compose exec app pytest
 
 # Database shell
-docker-compose exec db psql -U cellophane_user -d cellophanemail
+docker compose exec db psql -U cellophane_user -d cellophanemail
 
 # Python shell
-docker-compose exec app python
+docker compose exec app python
+
+# Run migrations manually
+docker compose run --rm migrate
 ```
+
+#### 🚀 Railway Deployment
+
+The Dockerfile is Railway-compatible out of the box:
+
+1. **Create Railway project** and connect your GitHub repo
+2. **Add PostgreSQL plugin** in Railway dashboard
+3. **Set environment variables** in Railway:
+   ```
+   DATABASE_URL=<auto-provided by Railway PostgreSQL plugin>
+   SECRET_KEY=<generate with: python -c "import secrets; print(secrets.token_urlsafe(32))">
+   ANTHROPIC_API_KEY=sk-ant-api03-your-key
+   AI_PROVIDER=anthropic
+   AI_MODEL=claude-3-5-sonnet-20241022
+   ```
+4. **Deploy** - Railway auto-detects the Dockerfile and uses `$PORT`
+
+The Dockerfile uses `${PORT:-8000}` so it works both locally (port 8000) and on Railway (dynamic port).
 
 📖 **Full Docker documentation:** See [docker-commands.md](./docker-commands.md)
 
@@ -278,21 +320,16 @@ WantedBy=multi-user.target
 ```
 
 #### Using Docker
-```dockerfile
-FROM python:3.11-slim
+```bash
+# Production build and run
+docker build -t cellophanemail .
+docker run -p 8000:8000 --env-file .env.docker cellophanemail
 
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY src/ ./src/
-COPY .env .
-
-ENV PYTHONPATH=/app/src
-
-EXPOSE 8000
-CMD ["uvicorn", "cellophanemail.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Or use docker compose for full stack
+docker compose up -d
 ```
+
+See `Dockerfile` for the full production image configuration (Python 3.12, uv package manager, health checks).
 
 ### Architecture Overview
 
