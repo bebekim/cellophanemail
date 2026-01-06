@@ -21,6 +21,14 @@ from .prompts import (
     format_analysis_prompt,
     format_rephrase_prompt,
 )
+from .rephraser import (
+    build_rephrase_context,
+    format_rephrased_with_notice,
+    get_rephrase_instructions,
+    estimate_rephrase_difficulty,
+    should_attempt_rephrase,
+    create_rephrase_summary,
+)
 
 __all__ = [
     # Types
@@ -41,4 +49,11 @@ __all__ = [
     "REPHRASE_PROMPT",
     "format_analysis_prompt",
     "format_rephrase_prompt",
+    # Rephraser
+    "build_rephrase_context",
+    "format_rephrased_with_notice",
+    "get_rephrase_instructions",
+    "estimate_rephrase_difficulty",
+    "should_attempt_rephrase",
+    "create_rephrase_summary",
 ]
