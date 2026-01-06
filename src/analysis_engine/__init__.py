@@ -29,6 +29,12 @@ from .rephraser import (
     should_attempt_rephrase,
     create_rephrase_summary,
 )
+from .mock import (
+    MockAnalyzer,
+    create_clean_analyzer,
+    create_toxic_analyzer,
+    create_graduated_analyzer,
+)
 
 __all__ = [
     # Types
@@ -56,4 +62,9 @@ __all__ = [
     "estimate_rephrase_difficulty",
     "should_attempt_rephrase",
     "create_rephrase_summary",
+    # Mock
+    "MockAnalyzer",
+    "create_clean_analyzer",
+    "create_toxic_analyzer",
+    "create_graduated_analyzer",
 ]
