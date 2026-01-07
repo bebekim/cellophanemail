@@ -1,5 +1,5 @@
 """CellophoneMail API routes."""
 
-from . import health, webhooks, auth
+from . import health, webhooks, auth, sms
 
-__all__ = ["health", "webhooks", "auth"]
+__all__ = ["health", "webhooks", "auth", "sms"]

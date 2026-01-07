@@ -16,7 +16,7 @@ from litestar.template.config import TemplateConfig
 from pathlib import Path
 
 from .config.settings import get_settings
-from .routes import health, webhooks, auth, frontend, billing, stripe_webhooks
+from .routes import health, webhooks, auth, frontend, billing, stripe_webhooks, sms
 from .plugins.manager import PluginManager
 from .middleware.jwt_auth import JWTAuthenticationMiddleware
 from .providers.postmark.webhook import PostmarkWebhookHandler
@@ -132,7 +132,7 @@ def create_app() -> Litestar:
             secret=settings.secret_key,
             cookie_name="cellophane_csrf",
             header_name="X-CSRF-Token",
-            exclude=["/webhooks/*", "/health/*", "/providers/*", "/billing/create-checkout"],  # Webhooks and providers need to work without CSRF
+            exclude=["/webhooks/*", "/health/*", "/providers/*", "/billing/create-checkout", "/api/*"],  # Webhooks, providers, and API endpoints need to work without CSRF
             safe_methods=["GET", "HEAD", "OPTIONS"],
         )
     
@@ -171,6 +171,7 @@ def create_app() -> Litestar:
             stripe_webhooks.StripeWebhookHandler,  # Stripe webhook events
             PostmarkWebhookHandler,  # New provider-based webhook
             GmailWebhookHandler,  # Gmail provider webhook
+            sms.SmsController,  # SMS analysis for Android app
         ],
         cors_config=cors_config,
         csrf_config=csrf_config,
