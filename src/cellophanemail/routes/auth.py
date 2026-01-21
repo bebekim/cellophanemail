@@ -51,8 +51,8 @@ class UserLogin(BaseModel):
 
 class AuthController(Controller):
     """Authentication and user management."""
-    
-    path = "/auth"
+
+    path = "/api/v1/auth"
     
     @get("/register")
     async def register_form(self, request: Request) -> Template:
