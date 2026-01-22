@@ -15,6 +15,10 @@ from cellophanemail.routes.sms import (
     HorsemanDetail,
     MessageAnalysisResponse,
     BatchAnalyzeResponse,
+    BatchSenderSummary,
+    DashboardRollup,
+    HorsemenCounts,
+    ENGINE_VERSION,
 )
 
 
@@ -272,11 +276,12 @@ class TestMessageAnalysisResponse:
 
 
 class TestBatchAnalyzeResponse:
-    """Tests for BatchAnalyzeResponse DTO."""
+    """Tests for BatchAnalyzeResponse DTO (stateless mode)."""
 
     def test_batch_response_structure(self):
-        """Batch response has correct structure."""
+        """Batch response has correct structure with aggregates."""
         response = BatchAnalyzeResponse(
+            engineVersion=ENGINE_VERSION,
             results=[
                 MessageAnalysisResponse(
                     client_message_id="sms:1",
@@ -291,23 +296,161 @@ class TestBatchAnalyzeResponse:
                 ),
                 MessageAnalysisResponse(
                     client_message_id="sms:2",
-                    horsemen=[],
-                    horsemen_types=[],
-                    has_horsemen=False,
-                    toxicity_score=0.0,
-                    threat_level="unknown",
-                    reasoning="",
-                    processing_time_ms=None,
-                    success=False,
-                    error="Failed",
+                    horsemen=[
+                        HorsemanDetail(
+                            type="criticism",
+                            confidence=0.8,
+                            severity="medium",
+                            indicators=["harsh tone"],
+                        )
+                    ],
+                    horsemen_types=["criticism"],
+                    has_horsemen=True,
+                    toxicity_score=0.6,
+                    threat_level="medium",
+                    reasoning="Criticism detected",
+                    processing_time_ms=150,
+                    success=True,
                 ),
             ],
             total=2,
-            successful=1,
-            failed=1,
+            successful=2,
+            failed=0,
+            senderSummaries=[
+                BatchSenderSummary(
+                    senderId="+1234567890",
+                    filteredCount=1,
+                    cleanCount=1,
+                    totalInBatch=2,
+                    lastFilteredTimestampMs=1704067200000,
+                    horsemenCounts=HorsemenCounts(CRITICISM=1),
+                )
+            ],
+            dashboardRollup=DashboardRollup(
+                totalAnalyzed=2,
+                filteredMessages=1,
+                cleanMessages=1,
+                uniqueSenders=1,
+                sendersWithFiltered=1,
+            ),
         )
 
+        assert response.engineVersion == ENGINE_VERSION
         assert response.total == 2
-        assert response.successful == 1
-        assert response.failed == 1
+        assert response.successful == 2
+        assert response.failed == 0
         assert len(response.results) == 2
+        assert len(response.senderSummaries) == 1
+        assert response.senderSummaries[0].senderId == "+1234567890"
+        assert response.senderSummaries[0].filteredCount == 1
+        assert response.dashboardRollup.totalAnalyzed == 2
+        assert response.dashboardRollup.filteredMessages == 1
+
+    def test_batch_response_defaults(self):
+        """Batch response has correct defaults for stateless fields."""
+        response = BatchAnalyzeResponse(
+            results=[],
+            total=0,
+            successful=0,
+            failed=0,
+        )
+
+        assert response.engineVersion == ENGINE_VERSION
+        assert response.senderSummaries == []
+        assert response.dashboardRollup.totalAnalyzed == 0
+        assert response.dashboardRollup.filteredMessages == 0
+
+
+class TestBatchSenderSummary:
+    """Tests for BatchSenderSummary DTO."""
+
+    def test_sender_summary_structure(self):
+        """Sender summary has all required fields."""
+        summary = BatchSenderSummary(
+            senderId="+1234567890",
+            filteredCount=5,
+            cleanCount=10,
+            totalInBatch=15,
+            lastFilteredTimestampMs=1704067200000,
+            horsemenCounts=HorsemenCounts(
+                CRITICISM=3,
+                CONTEMPT=2,
+                DEFENSIVENESS=0,
+                STONEWALLING=0,
+            ),
+        )
+
+        assert summary.senderId == "+1234567890"
+        assert summary.filteredCount == 5
+        assert summary.cleanCount == 10
+        assert summary.totalInBatch == 15
+        assert summary.lastFilteredTimestampMs == 1704067200000
+        assert summary.horsemenCounts.CRITICISM == 3
+        assert summary.horsemenCounts.CONTEMPT == 2
+
+    def test_sender_summary_defaults(self):
+        """Sender summary has correct defaults."""
+        summary = BatchSenderSummary(senderId="+1234567890")
+
+        assert summary.filteredCount == 0
+        assert summary.cleanCount == 0
+        assert summary.totalInBatch == 0
+        assert summary.lastFilteredTimestampMs is None
+        assert summary.horsemenCounts.CRITICISM == 0
+
+
+class TestDashboardRollup:
+    """Tests for DashboardRollup DTO."""
+
+    def test_dashboard_rollup_structure(self):
+        """Dashboard rollup has all required fields."""
+        rollup = DashboardRollup(
+            totalAnalyzed=100,
+            filteredMessages=25,
+            cleanMessages=75,
+            uniqueSenders=10,
+            sendersWithFiltered=5,
+        )
+
+        assert rollup.totalAnalyzed == 100
+        assert rollup.filteredMessages == 25
+        assert rollup.cleanMessages == 75
+        assert rollup.uniqueSenders == 10
+        assert rollup.sendersWithFiltered == 5
+
+    def test_dashboard_rollup_defaults(self):
+        """Dashboard rollup has correct defaults."""
+        rollup = DashboardRollup()
+
+        assert rollup.totalAnalyzed == 0
+        assert rollup.filteredMessages == 0
+        assert rollup.cleanMessages == 0
+        assert rollup.uniqueSenders == 0
+        assert rollup.sendersWithFiltered == 0
+
+
+class TestHorsemenCounts:
+    """Tests for HorsemenCounts DTO."""
+
+    def test_horsemen_counts_all_types(self):
+        """All horsemen types are represented."""
+        counts = HorsemenCounts(
+            CRITICISM=10,
+            CONTEMPT=5,
+            DEFENSIVENESS=3,
+            STONEWALLING=2,
+        )
+
+        assert counts.CRITICISM == 10
+        assert counts.CONTEMPT == 5
+        assert counts.DEFENSIVENESS == 3
+        assert counts.STONEWALLING == 2
+
+    def test_horsemen_counts_defaults(self):
+        """All horsemen counts default to zero."""
+        counts = HorsemenCounts()
+
+        assert counts.CRITICISM == 0
+        assert counts.CONTEMPT == 0
+        assert counts.DEFENSIVENESS == 0
+        assert counts.STONEWALLING == 0
