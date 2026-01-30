@@ -28,22 +28,12 @@ load_dotenv(dotenv_path=env_file)
 @dataclass
 class EmailAnalysis:
     """Complete email analysis result from LLM."""
-    toxicity_score: float  # 0.0-1.0
     threat_level: ThreatLevel
     safe: bool
-    
-    # Content analysis
-    fact_ratio: float
-    communication_manner: str
-    
-    # Harmful patterns
-    personal_attacks: List[str]
-    manipulation_tactics: List[str] 
-    implicit_threats: List[str]
-    
+
     # Four Horsemen detection
     horsemen_detected: List[HorsemanDetection]
-    
+
     # Analysis metadata
     reasoning: str
     confidence: float
@@ -83,7 +73,7 @@ class EmailToxicityAnalyzer(IEmailAnalyzer):
             
         import anthropic
         self.client = anthropic.Anthropic(api_key=api_key)
-        self.model_name = "claude-3-5-sonnet-20241022"
+        self.model_name = "claude-sonnet-4-5-20250929"
         self.provider = "anthropic"
         
     def analyze_email_toxicity(self, email_content: str, sender_email: str) -> EmailAnalysis:
@@ -116,7 +106,8 @@ class EmailToxicityAnalyzer(IEmailAnalyzer):
             processing_time = int((datetime.now() - start_time).total_seconds() * 1000)
             analysis.processing_time_ms = processing_time
             
-            logger.info(f"Email analysis completed in {processing_time}ms, toxicity: {analysis.toxicity_score:.3f}")
+            horsemen_names = [h.horseman for h in analysis.horsemen_detected]
+            logger.info(f"Email analysis completed in {processing_time}ms, threat_level: {analysis.threat_level.value}, horsemen: {horsemen_names}")
             return analysis
             
         except Exception as e:
@@ -126,68 +117,20 @@ class EmailToxicityAnalyzer(IEmailAnalyzer):
     
     def _build_analysis_prompt(self, email_content: str, sender_email: str) -> str:
         """Build comprehensive analysis prompt for LLM."""
-        
-        return f"""You are an expert email safety analyzer. Analyze this email comprehensively and provide a detailed JSON assessment.
 
-EMAIL TO ANALYZE:
+        return f"""Analyze this message for the Four Horsemen of toxic communication. Output ONLY valid JSON, no other text.
+
 From: {sender_email}
 Content: {email_content}
 
-ANALYSIS INSTRUCTIONS:
-Evaluate this email across all dimensions and provide scores/classifications for:
+FOUR HORSEMEN (detect with confidence 0.0-1.0 and severity low/medium/high):
+1. CRITICISM: Character attacks ("you always", "you never", personality flaws)
+2. CONTEMPT: Superiority, mockery, disgust (MOST DESTRUCTIVE - weight heavily)
+3. DEFENSIVENESS: Blame-shifting, victim-playing, counter-attacks
+4. STONEWALLING: Withdrawal, silent treatment, refusing to engage
 
-1. TOXICITY ASSESSMENT (0.0-1.0 scale):
-   - Overall toxicity score considering all harmful patterns
-   - 0.0-0.1: Clean professional communication
-   - 0.1-0.3: Minor concerning patterns, mostly professional  
-   - 0.3-0.6: Moderate toxicity with clear harmful elements
-   - 0.6-0.8: High toxicity with multiple serious issues
-   - 0.8-1.0: Extreme toxicity, severe threats/attacks
-
-2. CONTENT COMPOSITION:
-   - Fact ratio: Percentage of content that is factual vs emotional (0.0-1.0)
-   - Communication manner: "professional", "casual", "aggressive", "manipulative", "threatening"
-
-3. HARMFUL PATTERNS (list specific examples found):
-   - Personal attacks: Direct insults, character assassination, demeaning language
-   - Manipulation tactics: Emotional manipulation, gaslighting, blame-shifting
-   - Implicit threats: Veiled threats, intimidation, coercion
-
-4. FOUR HORSEMEN RELATIONSHIP PATTERNS:
-   For each detected pattern, provide: name, confidence (0.0-1.0), severity ("low", "medium", "high"), specific indicators
-   - Criticism: Personal attacks on character rather than behavior
-   - Contempt: Superiority, mockery, sarcasm, cynicism  
-   - Defensiveness: Victim-playing, counter-attacking, blame-shifting
-   - Stonewalling: Withdrawal, silent treatment, emotional shutdown
-
-5. LANGUAGE AND CULTURAL CONTEXT:
-   - Detected language (ISO code)
-   - Cultural communication patterns that affect interpretation
-
-RESPOND WITH VALID JSON ONLY:
-{{
-    "toxicity_score": 0.0,
-    "threat_level": "safe|low|medium|high|critical", 
-    "safe": true,
-    "fact_ratio": 0.0,
-    "communication_manner": "professional",
-    "personal_attacks": [],
-    "manipulation_tactics": [],
-    "implicit_threats": [],
-    "horsemen_detected": [
-        {{
-            "horseman": "criticism|contempt|defensiveness|stonewalling",
-            "confidence": 0.0,
-            "severity": "low|medium|high",
-            "indicators": ["specific example from email"]
-        }}
-    ],
-    "reasoning": "Detailed explanation of assessment",
-    "confidence": 0.0,
-    "language_detected": "en"
-}}
-
-Important: Be precise with toxicity scoring. Professional emails should score < 0.1, obvious attacks should score > 0.8. Consider cultural context and language nuances."""
+Output this exact JSON structure with your analysis:
+{{"safe": true, "horsemen_detected": [{{"horseman": "criticism|contempt|defensiveness|stonewalling", "confidence": 0.0, "severity": "low|medium|high", "indicators": ["specific phrase"]}}], "reasoning": "explanation here", "confidence": 0.9, "language_detected": "en"}}"""
 
     def _call_llm(self, prompt: str) -> str:
         """Call LLM API - currently Anthropic, easily switchable."""
@@ -206,47 +149,73 @@ Important: Be precise with toxicity scoring. Professional emails should score < 
             #     return self._call_llama(prompt)
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
     
+    def _extract_json(self, response: str) -> str:
+        """Extract JSON from LLM response, handling markdown code blocks."""
+        import re
+
+        # Try to extract JSON from markdown code blocks
+        # Match ```json ... ``` or ``` ... ```
+        code_block_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response, re.DOTALL)
+        if code_block_match:
+            return code_block_match.group(1)
+
+        # Try to find raw JSON object
+        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+        if json_match:
+            return json_match.group(0)
+
+        # Return original if no JSON found
+        return response
+
     def _parse_llm_response(self, response: str, original_content: str) -> EmailAnalysis:
         """Parse LLM JSON response into structured analysis."""
-        
+        from json_repair import repair_json
+
         try:
-            data = json.loads(response)
-            
-            # Parse Four Horsemen detections
+            # Extract JSON from potential markdown wrapping
+            json_str = self._extract_json(response)
+            # Repair common JSON syntax errors (missing commas, trailing commas, etc.)
+            repaired_json = repair_json(json_str)
+            data = json.loads(repaired_json)
+
+            # Parse Four Horsemen detections (handle various formats)
             horsemen = []
-            for h in data.get("horsemen_detected", []):
-                horsemen.append(HorsemanDetection(
-                    horseman=h["horseman"],
-                    confidence=float(h["confidence"]),
-                    indicators=h.get("indicators", []),
-                    severity=h["severity"]
-                ))
-            
-            # Map threat level string to enum
-            threat_level_map = {
-                "safe": ThreatLevel.SAFE,
-                "low": ThreatLevel.LOW, 
-                "medium": ThreatLevel.MEDIUM,
-                "high": ThreatLevel.HIGH,
-                "critical": ThreatLevel.CRITICAL
-            }
-            
+            horsemen_data = data.get("horsemen_detected", [])
+            if isinstance(horsemen_data, list):
+                for h in horsemen_data:
+                    if isinstance(h, dict):
+                        # Full format: {"horseman": "criticism", "confidence": 0.8, ...}
+                        horsemen.append(HorsemanDetection(
+                            horseman=h.get("horseman", "unknown"),
+                            confidence=float(h.get("confidence", 0.5)),
+                            indicators=h.get("indicators", []),
+                            severity=h.get("severity", "medium")
+                        ))
+                    elif isinstance(h, str) and h:
+                        # Simple format: just the name like "criticism"
+                        horsemen.append(HorsemanDetection(
+                            horseman=h,
+                            confidence=0.7,
+                            indicators=[],
+                            severity="medium"
+                        ))
+
+            # Derive threat level from horsemen (contempt-weighted)
+            threat_level = ThreatLevel.from_horsemen(horsemen)
+
+            # Determine safe flag based on threat level
+            safe = threat_level == ThreatLevel.SAFE
+
             return EmailAnalysis(
-                toxicity_score=float(data["toxicity_score"]),
-                threat_level=threat_level_map.get(data["threat_level"], ThreatLevel.LOW),
-                safe=bool(data["safe"]),
-                fact_ratio=float(data["fact_ratio"]),
-                communication_manner=data["communication_manner"],
-                personal_attacks=data.get("personal_attacks", []),
-                manipulation_tactics=data.get("manipulation_tactics", []),
-                implicit_threats=data.get("implicit_threats", []),
+                threat_level=threat_level,
+                safe=safe,
                 horsemen_detected=horsemen,
                 reasoning=data.get("reasoning", ""),
                 confidence=float(data.get("confidence", 0.7)),
                 processing_time_ms=0,  # Set by caller
                 language_detected=data.get("language_detected", "en")
             )
-            
+
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             logger.error(f"Failed to parse LLM response: {e}, response: {response[:200]}")
             # No fallback - re-raise the error
@@ -307,11 +276,10 @@ Respond with one word: POSITIVE, NEUTRAL, or NEGATIVE"""
 
     def to_legacy_analysis_result(self, analysis: EmailAnalysis) -> AnalysisResult:
         """Convert EmailAnalysis to legacy AnalysisResult format for compatibility."""
-        
+
         return AnalysisResult(
             safe=analysis.safe,
             threat_level=analysis.threat_level,
-            toxicity_score=analysis.toxicity_score,
             horsemen_detected=analysis.horsemen_detected,
             reasoning=analysis.reasoning,
             processing_time_ms=analysis.processing_time_ms,

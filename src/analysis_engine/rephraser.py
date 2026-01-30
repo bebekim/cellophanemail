@@ -3,7 +3,7 @@
 
 from typing import Dict, List, Optional
 
-from .types import AnalysisResult
+from .types import AnalysisResult, ThreatLevel
 
 
 def build_rephrase_context(analysis: AnalysisResult) -> Dict[str, str]:
@@ -14,10 +14,10 @@ def build_rephrase_context(analysis: AnalysisResult) -> Dict[str, str]:
         analysis: The analysis result containing toxicity info
 
     Returns:
-        Dict with toxicity_score, detected_patterns, and reasoning
+        Dict with threat_level, detected_patterns, and reasoning
     """
     return {
-        "toxicity_score": f"{analysis.toxicity_score:.2f}",
+        "threat_level": analysis.threat_level.value,
         "detected_patterns": ", ".join(analysis.detected_horsemen_names) or "none",
         "reasoning": analysis.reasoning,
     }
@@ -104,48 +104,51 @@ def get_rephrase_instructions(analysis: AnalysisResult) -> List[str]:
 
 def estimate_rephrase_difficulty(analysis: AnalysisResult) -> str:
     """
-    Estimate how difficult the rephrasing will be.
+    Estimate how difficult the rephrasing will be based on horsemen detected.
 
     Used to set expectations and potentially adjust LLM parameters.
 
     Args:
-        analysis: Analysis result with toxicity info
+        analysis: Analysis result with horsemen info
 
     Returns:
         "easy", "moderate", or "difficult"
     """
-    score = analysis.toxicity_score
-    num_horsemen = len(analysis.detected_horsemen_names)
+    horsemen = analysis.detected_horsemen_names
+    num_horsemen = len(horsemen)
+    has_contempt = "contempt" in [h.lower() for h in horsemen]
 
-    if score < 0.4 and num_horsemen <= 1:
-        return "easy"
-    elif score < 0.7 and num_horsemen <= 2:
+    # Contempt is the hardest to rephrase (Gottman research)
+    if has_contempt or num_horsemen >= 3:
+        return "difficult"
+    elif num_horsemen == 2:
         return "moderate"
     else:
-        return "difficult"
+        return "easy"
 
 
 def should_attempt_rephrase(analysis: AnalysisResult) -> bool:
     """
-    Determine if rephrasing should be attempted.
+    Determine if rephrasing should be attempted based on threat level.
 
-    Very high toxicity content may be better blocked entirely rather
-    than attempting to rephrase.
+    Very high toxicity content (CRITICAL) may be better blocked entirely.
+    Safe content doesn't need rephrasing.
 
     Args:
-        analysis: Analysis result with toxicity info
+        analysis: Analysis result with threat level info
 
     Returns:
         True if rephrasing should be attempted, False if blocking is better
     """
-    # Don't attempt to rephrase extremely toxic content
-    if analysis.toxicity_score >= 0.90:
+    # Don't attempt to rephrase CRITICAL content - should be blocked
+    if analysis.threat_level == ThreatLevel.CRITICAL:
         return False
 
-    # Don't attempt if content is safe (no need)
-    if analysis.toxicity_score < 0.30:
+    # Don't attempt if content is SAFE (no need)
+    if analysis.threat_level == ThreatLevel.SAFE:
         return False
 
+    # Attempt rephrase for LOW, MEDIUM, and HIGH threat levels
     return True
 
 
@@ -175,7 +178,8 @@ def create_rephrase_summary(
         )
         if original_length > 0
         else 0,
-        "toxicity_score": analysis.toxicity_score,
+        "is_toxic": analysis.is_toxic,
+        "threat_level": analysis.threat_level.value,
         "horsemen_detected": analysis.detected_horsemen_names,
         "difficulty": estimate_rephrase_difficulty(analysis),
     }

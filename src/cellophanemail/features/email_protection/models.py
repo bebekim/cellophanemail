@@ -45,7 +45,7 @@ class ProtectionResult:
         return {
             "should_forward": self.should_forward,
             "threat_level": self.analysis.threat_level.value if self.analysis else None,
-            "toxicity_score": self.analysis.toxicity_score if self.analysis else 0.0,
+            "is_toxic": self.analysis.is_toxic if self.analysis else False,
             "horsemen_detected": [
                 h.horseman for h in (self.analysis.horsemen_detected if self.analysis else [])
             ],

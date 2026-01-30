@@ -145,7 +145,6 @@ class MessageAnalysisResponse(BaseModel):
     horsemen: List[HorsemanDetail]
     horsemen_types: List[str]
     has_horsemen: bool
-    toxicity_score: float
     threat_level: str
     reasoning: str
     processing_time_ms: Optional[int]
@@ -331,7 +330,6 @@ class SMSAnalysisController(Controller):
                     ],
                     horsemen_types=horsemen_types,
                     has_horsemen=has_horsemen,
-                    toxicity_score=r.get("toxicity_score", 0.0),
                     threat_level=r.get("threat_level", "safe"),
                     reasoning=r.get("reasoning", ""),
                     processing_time_ms=r.get("processing_time_ms"),
@@ -366,7 +364,6 @@ class SMSAnalysisController(Controller):
                     horsemen=[],
                     horsemen_types=[],
                     has_horsemen=False,
-                    toxicity_score=0.0,
                     threat_level="unknown",
                     reasoning="",
                     processing_time_ms=None,
@@ -617,7 +614,6 @@ class AnalysisController(Controller):
                 horsemen=[HorsemanDetail(**h) for h in horsemen],
                 horsemen_types=horsemen_types,
                 has_horsemen=analysis.has_horsemen,
-                toxicity_score=(analysis.toxicity_score or 0) / 1000.0,
                 threat_level=analysis.threat_level or "unknown",
                 reasoning=analysis.reasoning or "",
                 processing_time_ms=analysis.processing_time_ms,
@@ -785,7 +781,6 @@ class AnalysisController(Controller):
                 horsemen=[HorsemanDetail(**h) for h in horsemen],
                 horsemen_types=horsemen_types,
                 has_horsemen=analysis.has_horsemen,
-                toxicity_score=(analysis.toxicity_score or 0) / 1000.0,
                 threat_level=analysis.threat_level or "unknown",
                 reasoning=analysis.reasoning or "",
                 processing_time_ms=analysis.processing_time_ms,

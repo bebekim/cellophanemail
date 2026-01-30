@@ -16,7 +16,7 @@ from litestar.template.config import TemplateConfig
 from pathlib import Path
 
 from .config.settings import get_settings
-from .routes import health, webhooks, auth, frontend, billing, stripe_webhooks, sms
+from .routes import health, webhooks, auth, frontend, billing, stripe_webhooks, messages, sms
 from .plugins.manager import PluginManager
 from .middleware.jwt_auth import JWTAuthenticationMiddleware
 from .providers.postmark.webhook import PostmarkWebhookHandler
@@ -171,7 +171,9 @@ def create_app() -> Litestar:
             stripe_webhooks.StripeWebhookHandler,  # Stripe webhook events
             PostmarkWebhookHandler,  # New provider-based webhook
             GmailWebhookHandler,  # Gmail provider webhook
-            sms.SmsController,  # SMS analysis for Android app
+            messages.MessagesController,  # Platform-agnostic message analysis (SMS, email, chat)
+            sms.SMSAnalysisController,  # SMS batch analysis (sync)
+            sms.AnalysisController,  # Analysis jobs and results
         ],
         cors_config=cors_config,
         csrf_config=csrf_config,

@@ -18,18 +18,40 @@ class ThreatLevel(str, Enum):
     CRITICAL = "critical"
 
     @classmethod
-    def from_score(cls, score: float) -> "ThreatLevel":
-        """Derive threat level from toxicity score."""
-        if score < 0.30:
+    def from_horsemen(cls, horsemen: List["HorsemanDetection"]) -> "ThreatLevel":
+        """Derive threat level from detected horsemen (contempt-weighted).
+
+        Gottman research shows contempt is the #1 predictor of relationship failure,
+        so it escalates threat level immediately.
+
+        Logic:
+        - SAFE: No significant horsemen detected
+        - LOW: Single non-contempt horseman
+        - MEDIUM: 2 non-contempt horsemen, OR criticism + defensiveness
+        - HIGH: Contempt detected, OR 3+ non-contempt horsemen
+        - CRITICAL: Contempt + any other horseman, OR all 4 horsemen
+        """
+        significant = [h for h in horsemen if h.is_significant]
+        types = {h.horseman for h in significant}
+
+        if not significant:
             return cls.SAFE
-        elif score < 0.55:
-            return cls.LOW
-        elif score < 0.70:
-            return cls.MEDIUM
-        elif score < 0.90:
-            return cls.HIGH
-        else:
+
+        has_contempt = "contempt" in types
+
+        if has_contempt:
+            return cls.CRITICAL if len(types) > 1 else cls.HIGH
+
+        if len(types) >= 4:
             return cls.CRITICAL
+
+        if len(types) >= 3:
+            return cls.HIGH
+
+        if len(types) == 2:
+            return cls.MEDIUM
+
+        return cls.LOW
 
 
 class HorsemanDetection(BaseModel):
@@ -53,7 +75,6 @@ class AnalysisResult(BaseModel):
 
     safe: bool
     threat_level: ThreatLevel
-    toxicity_score: float = Field(..., ge=0.0, le=1.0)
     horsemen_detected: List[HorsemanDetection] = Field(default_factory=list)
     reasoning: str
     processing_time_ms: int
@@ -65,6 +86,11 @@ class AnalysisResult(BaseModel):
     def detected_horsemen_names(self) -> List[str]:
         """Get names of significantly detected horsemen."""
         return [h.horseman for h in self.horsemen_detected if h.is_significant]
+
+    @property
+    def is_toxic(self) -> bool:
+        """Check if content is considered toxic based on threat level."""
+        return self.threat_level != ThreatLevel.SAFE
 
 
 class ProtectionResult(BaseModel):

@@ -10,7 +10,6 @@ from .types import (
 from .scoring import (
     ProtectionAction,
     ProtectionDecision,
-    DEFAULT_THRESHOLDS,
     decide_action,
     get_action_description,
 )
@@ -45,7 +44,6 @@ __all__ = [
     # Scoring
     "ProtectionAction",
     "ProtectionDecision",
-    "DEFAULT_THRESHOLDS",
     "decide_action",
     "get_action_description",
     # Interface

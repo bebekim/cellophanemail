@@ -1,12 +1,12 @@
-# ABOUTME: Protection decision logic and toxicity thresholds
+# ABOUTME: Protection decision logic based on Four Horsemen detection
 # ABOUTME: Identical across all apps (web, Android)
 
 from enum import Enum
-from typing import Dict, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
-from .types import AnalysisResult
+from .types import AnalysisResult, HorsemanDetection, ThreatLevel
 
 
 class ProtectionAction(str, Enum):
@@ -25,46 +25,34 @@ class ProtectionDecision(BaseModel):
     action: ProtectionAction
     processed_content: str
     reasoning: str
-    toxicity_score: float
+    threat_level: ThreatLevel
     original_analysis: Optional[AnalysisResult] = None
 
 
-# Default thresholds - recalibrated 2025-08-23 based on real LLM scoring patterns
-DEFAULT_THRESHOLDS: Dict[str, float] = {
-    "forward_clean": 0.30,  # Clean emails typically score 0.01-0.20
-    "forward_context": 0.55,  # Minor toxicity emails score 0.35-0.50
-    "redact_harmful": 0.70,  # Moderate toxicity emails score around 0.65
-    "summarize_only": 0.90,  # High toxicity emails score 0.75-0.85
-}
-
-
-def decide_action(
-    toxicity_score: float, thresholds: Optional[Dict[str, float]] = None
-) -> ProtectionAction:
+def decide_action(horsemen: List[HorsemanDetection]) -> ProtectionAction:
     """
-    Determine protection action based on toxicity score.
+    Determine protection action based on detected horsemen.
 
     This is the core decision logic shared across all apps.
+    Uses contempt-weighted model based on Gottman research.
 
     Args:
-        toxicity_score: Toxicity score from 0.0 to 1.0
-        thresholds: Optional custom thresholds (uses DEFAULT_THRESHOLDS if None)
+        horsemen: List of detected horsemen patterns
 
     Returns:
         ProtectionAction indicating how to handle the content
     """
-    t = thresholds or DEFAULT_THRESHOLDS
+    threat_level = ThreatLevel.from_horsemen(horsemen)
 
-    if toxicity_score < t["forward_clean"]:
-        return ProtectionAction.FORWARD_CLEAN
-    elif toxicity_score < t["forward_context"]:
-        return ProtectionAction.FORWARD_WITH_CONTEXT
-    elif toxicity_score < t["redact_harmful"]:
-        return ProtectionAction.REDACT_HARMFUL
-    elif toxicity_score < t["summarize_only"]:
-        return ProtectionAction.SUMMARIZE_ONLY
-    else:
-        return ProtectionAction.BLOCK_ENTIRELY
+    action_map = {
+        ThreatLevel.SAFE: ProtectionAction.FORWARD_CLEAN,
+        ThreatLevel.LOW: ProtectionAction.FORWARD_WITH_CONTEXT,
+        ThreatLevel.MEDIUM: ProtectionAction.REDACT_HARMFUL,
+        ThreatLevel.HIGH: ProtectionAction.SUMMARIZE_ONLY,
+        ThreatLevel.CRITICAL: ProtectionAction.BLOCK_ENTIRELY,
+    }
+
+    return action_map[threat_level]
 
 
 def get_action_description(action: ProtectionAction) -> str:

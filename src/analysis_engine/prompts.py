@@ -1,50 +1,44 @@
 # ABOUTME: LLM prompts for Four Horseman analysis
 # ABOUTME: Identical prompts ensure consistent analysis across platforms
 
-ANALYSIS_PROMPT = """You are an expert email safety analyzer. Analyze this content comprehensively and provide a detailed JSON assessment.
+ANALYSIS_PROMPT = """Analyze this content for the Four Horsemen of toxic communication.
 
 CONTENT TO ANALYZE:
 From: {sender}
 Content: {content}
 
-ANALYSIS INSTRUCTIONS:
-Evaluate this content across all dimensions and provide scores/classifications for:
+FOUR HORSEMEN DETECTION:
+Detect each pattern with confidence (0.0-1.0) and severity (low/medium/high).
+CONTEMPT is the MOST DESTRUCTIVE pattern - weight it heavily (Gottman research).
 
-1. TOXICITY ASSESSMENT (0.0-1.0 scale):
-   - Overall toxicity score considering all harmful patterns
-   - 0.0-0.1: Clean professional communication
-   - 0.1-0.3: Minor concerning patterns, mostly professional
-   - 0.3-0.6: Moderate toxicity with clear harmful elements
-   - 0.6-0.8: High toxicity with multiple serious issues
-   - 0.8-1.0: Extreme toxicity, severe threats/attacks
+1. CRITICISM: Character attacks on who someone IS rather than specific behavior
+   - "you always", "you never", personality attacks, blame for inherent flaws
+   - NOT constructive feedback about specific actions
 
-2. FOUR HORSEMEN RELATIONSHIP PATTERNS:
-   For each detected pattern, provide: name, confidence (0.0-1.0), severity ("low", "medium", "high"), specific indicators
-   - Criticism: Personal attacks on character rather than behavior
-   - Contempt: Superiority, mockery, sarcasm, cynicism
-   - Defensiveness: Victim-playing, counter-attacking, blame-shifting
-   - Stonewalling: Withdrawal, silent treatment, emotional shutdown
+2. CONTEMPT: Superiority, mockery, disgust, sarcasm (MOST DESTRUCTIVE)
+   - Eye-rolling language, name-calling, sneering, hostile humor
+   - Treating others as inferior or beneath consideration
 
-3. HARMFUL PATTERNS:
-   - Personal attacks: Direct insults, character assassination
-   - Manipulation tactics: Emotional manipulation, gaslighting
-   - Implicit threats: Veiled threats, intimidation
+3. DEFENSIVENESS: Blame-shifting, victim-playing, counter-attacks
+   - "It's not my fault", making excuses, deflecting responsibility
+   - Reversing blame onto the other person
+
+4. STONEWALLING: Withdrawal, silent treatment, refusing to engage
+   - Shutting down, checking out, giving monosyllabic responses
+   - Refusing to participate in discussion
 
 RESPOND WITH VALID JSON ONLY:
 {{
-    "toxicity_score": 0.0,
-    "threat_level": "safe|low|medium|high|critical",
-    "safe": true,
     "horsemen_detected": [
         {{
             "horseman": "criticism|contempt|defensiveness|stonewalling",
             "confidence": 0.0,
             "severity": "low|medium|high",
-            "indicators": ["specific example"]
+            "indicators": ["specific phrase or pattern"]
         }}
     ],
-    "reasoning": "Detailed explanation",
-    "processing_time_ms": 0
+    "safe": true,
+    "reasoning": "Detailed explanation of analysis"
 }}"""
 
 
@@ -54,7 +48,6 @@ ORIGINAL MESSAGE:
 {content}
 
 ANALYSIS:
-- Toxicity score: {toxicity_score}
 - Detected patterns: {detected_patterns}
 - Issues: {reasoning}
 
@@ -82,14 +75,12 @@ def format_analysis_prompt(content: str, sender: str = "") -> str:
 
 def format_rephrase_prompt(
     content: str,
-    toxicity_score: float,
     detected_patterns: str,
     reasoning: str,
 ) -> str:
     """Format the rephrase prompt with analysis details."""
     return REPHRASE_PROMPT.format(
         content=content,
-        toxicity_score=f"{toxicity_score:.2f}",
         detected_patterns=detected_patterns or "none",
         reasoning=reasoning,
     )

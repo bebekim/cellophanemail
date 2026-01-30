@@ -50,17 +50,15 @@ class StreamlinedEmailProtectionProcessor:
     - Better error handling and fallbacks
     """
     
-    def __init__(self, 
+    def __init__(self,
                  analyzer: Optional[IEmailAnalyzer] = None,
-                 temperature: float = 0.0,
-                 thresholds: Optional[dict] = None):
+                 temperature: float = 0.0):
         """
         Initialize streamlined processor.
-        
+
         Args:
             analyzer: Email analyzer to inject. If None, uses factory to create one
             temperature: LLM temperature. Use 0.0 for deterministic testing
-            thresholds: Custom decision thresholds. Uses empirical defaults if None
         """
         if analyzer is not None:
             self.analyzer = analyzer
@@ -69,7 +67,8 @@ class StreamlinedEmailProtectionProcessor:
             self.analyzer = AnalyzerFactory.create_analyzer(temperature=temperature)
             logger.info(f"Created analyzer via factory: {type(self.analyzer).__name__}")
             
-        self.decision_maker = GraduatedDecisionMaker(thresholds or EMPIRICAL_THRESHOLDS)
+        # GraduatedDecisionMaker now derives thresholds from horsemen detection
+        self.decision_maker = GraduatedDecisionMaker()
         self.storage = ProtectionLogStorage()
         
         logger.info(f"Initialized streamlined processor with temperature={temperature}")
