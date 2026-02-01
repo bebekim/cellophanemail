@@ -488,6 +488,28 @@
 
 * IN PROGRESS 🚧
 
+** TODO Railway Staging Environment Configuration
+   SCHEDULED: <2026-02-02>
+   - [ ] Configure Railway dashboard: test environment → watch `staging` branch
+         Go to: https://railway.com/project/77cfc010-27b0-4265-90a9-6a90251d7459
+         1. Select `test` environment
+         2. Click `cellophanemail` service → Settings → Source
+         3. Change branch from `main` to `staging`
+
+   **Deployment Workflow After Configuration:**
+   - `git push origin staging` → deploys to test (cellophanemail-test.up.railway.app)
+   - `git push origin main` → deploys to production (cellophanemail-production.up.railway.app)
+
+** TODO Implement Forgot Password Flow
+   SCHEDULED: <2026-02-02>
+   - [ ] Create `/auth/forgot-password` route in FrontendController
+   - [ ] Create forgot password template (auth/forgot_password.html)
+   - [ ] Add POST `/api/v1/auth/forgot-password` endpoint
+   - [ ] Add POST `/api/v1/auth/reset-password` endpoint
+   - [ ] Implement password reset token generation
+   - [ ] Send password reset email via Postmark
+   - [ ] Create reset password template (auth/reset_password.html)
+
 ** TODO Background Cleanup Task Completion (TDD Cycle 4)
    SCHEDULED: <2025-09-09>
    - [ ] Complete remaining background cleanup implementation
