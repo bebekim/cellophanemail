@@ -14,15 +14,17 @@ load_dotenv(env_path)
 # Set testing mode
 os.environ["TESTING"] = "true"
 
+# CRITICAL: Set testing environment BEFORE any app imports
+# This must happen before settings.py is imported
+os.environ["TESTING"] = "true"
+
 # Add src directory to path for imports
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
+# Now safe to import app components
 from litestar.testing import AsyncTestClient
 from cellophanemail.app import create_app
-
-# Set testing environment variable
-os.environ["TESTING"] = "true"
 
 
 @pytest.fixture(scope="function")
@@ -43,13 +45,12 @@ async def test_client() -> AsyncGenerator[AsyncTestClient, None]:
 @pytest.fixture(autouse=True)
 def set_testing_env():
     """Automatically set testing environment for all tests."""
+    # TESTING is already set at module level, but ensure it stays set
     os.environ["TESTING"] = "true"
-    
+
     # Clear settings cache to ensure testing flag is picked up
     from cellophanemail.config.settings import get_settings
     get_settings.cache_clear()
-    
+
     yield
-    # Clean up after test
-    if "TESTING" in os.environ:
-        del os.environ["TESTING"]
+    # Don't delete TESTING - keep it for the whole test session

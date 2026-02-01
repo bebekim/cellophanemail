@@ -12,7 +12,6 @@ from analysis_engine import (
     # Scoring
     ProtectionAction,
     ProtectionDecision,
-    DEFAULT_THRESHOLDS,
     decide_action,
     get_action_description,
     # Prompts
@@ -22,7 +21,7 @@ from analysis_engine import (
 
 
 class TestThreatLevel:
-    """Tests for ThreatLevel enum and from_score method."""
+    """Tests for ThreatLevel enum and from_horsemen method."""
 
     def test_threat_level_values(self):
         """Verify all threat level values exist."""
@@ -32,35 +31,100 @@ class TestThreatLevel:
         assert ThreatLevel.HIGH == "high"
         assert ThreatLevel.CRITICAL == "critical"
 
-    def test_from_score_safe(self):
-        """Scores below 0.30 should be SAFE."""
-        assert ThreatLevel.from_score(0.0) == ThreatLevel.SAFE
-        assert ThreatLevel.from_score(0.1) == ThreatLevel.SAFE
-        assert ThreatLevel.from_score(0.29) == ThreatLevel.SAFE
+    def test_from_horsemen_safe_no_horsemen(self):
+        """No horsemen detected should be SAFE."""
+        assert ThreatLevel.from_horsemen([]) == ThreatLevel.SAFE
 
-    def test_from_score_low(self):
-        """Scores 0.30-0.55 should be LOW."""
-        assert ThreatLevel.from_score(0.30) == ThreatLevel.LOW
-        assert ThreatLevel.from_score(0.40) == ThreatLevel.LOW
-        assert ThreatLevel.from_score(0.54) == ThreatLevel.LOW
+    def test_from_horsemen_safe_insignificant_horsemen(self):
+        """Only insignificant horsemen (confidence <= 0.5) should be SAFE."""
+        horsemen = [
+            HorsemanDetection(
+                horseman="criticism",
+                confidence=0.3,  # Below significance threshold
+                indicators=["minor complaint"],
+                severity="low",
+            ),
+        ]
+        assert ThreatLevel.from_horsemen(horsemen) == ThreatLevel.SAFE
 
-    def test_from_score_medium(self):
-        """Scores 0.55-0.70 should be MEDIUM."""
-        assert ThreatLevel.from_score(0.55) == ThreatLevel.MEDIUM
-        assert ThreatLevel.from_score(0.60) == ThreatLevel.MEDIUM
-        assert ThreatLevel.from_score(0.69) == ThreatLevel.MEDIUM
+    def test_from_horsemen_low_single_non_contempt(self):
+        """Single non-contempt horseman should be LOW."""
+        horsemen = [
+            HorsemanDetection(
+                horseman="criticism",
+                confidence=0.6,
+                indicators=["character attack"],
+                severity="medium",
+            ),
+        ]
+        assert ThreatLevel.from_horsemen(horsemen) == ThreatLevel.LOW
 
-    def test_from_score_high(self):
-        """Scores 0.70-0.90 should be HIGH."""
-        assert ThreatLevel.from_score(0.70) == ThreatLevel.HIGH
-        assert ThreatLevel.from_score(0.80) == ThreatLevel.HIGH
-        assert ThreatLevel.from_score(0.89) == ThreatLevel.HIGH
+    def test_from_horsemen_medium_two_non_contempt(self):
+        """Two non-contempt horsemen should be MEDIUM."""
+        horsemen = [
+            HorsemanDetection(
+                horseman="criticism",
+                confidence=0.7,
+                indicators=["attack"],
+                severity="medium",
+            ),
+            HorsemanDetection(
+                horseman="defensiveness",
+                confidence=0.6,
+                indicators=["blame-shifting"],
+                severity="medium",
+            ),
+        ]
+        assert ThreatLevel.from_horsemen(horsemen) == ThreatLevel.MEDIUM
 
-    def test_from_score_critical(self):
-        """Scores 0.90+ should be CRITICAL."""
-        assert ThreatLevel.from_score(0.90) == ThreatLevel.CRITICAL
-        assert ThreatLevel.from_score(0.95) == ThreatLevel.CRITICAL
-        assert ThreatLevel.from_score(1.0) == ThreatLevel.CRITICAL
+    def test_from_horsemen_high_contempt_alone(self):
+        """Contempt alone should be HIGH."""
+        horsemen = [
+            HorsemanDetection(
+                horseman="contempt",
+                confidence=0.8,
+                indicators=["mockery", "superiority"],
+                severity="high",
+            ),
+        ]
+        assert ThreatLevel.from_horsemen(horsemen) == ThreatLevel.HIGH
+
+    def test_from_horsemen_high_three_non_contempt(self):
+        """Three non-contempt horsemen should be HIGH."""
+        horsemen = [
+            HorsemanDetection(horseman="criticism", confidence=0.7, indicators=["attack"], severity="medium"),
+            HorsemanDetection(horseman="defensiveness", confidence=0.6, indicators=["blame"], severity="medium"),
+            HorsemanDetection(horseman="stonewalling", confidence=0.6, indicators=["withdrawal"], severity="medium"),
+        ]
+        assert ThreatLevel.from_horsemen(horsemen) == ThreatLevel.HIGH
+
+    def test_from_horsemen_critical_contempt_plus_other(self):
+        """Contempt + any other horseman should be CRITICAL."""
+        horsemen = [
+            HorsemanDetection(
+                horseman="contempt",
+                confidence=0.9,
+                indicators=["mockery"],
+                severity="high",
+            ),
+            HorsemanDetection(
+                horseman="criticism",
+                confidence=0.7,
+                indicators=["attack"],
+                severity="medium",
+            ),
+        ]
+        assert ThreatLevel.from_horsemen(horsemen) == ThreatLevel.CRITICAL
+
+    def test_from_horsemen_critical_all_four(self):
+        """All four horsemen should be CRITICAL."""
+        horsemen = [
+            HorsemanDetection(horseman="criticism", confidence=0.8, indicators=["attack"], severity="high"),
+            HorsemanDetection(horseman="contempt", confidence=0.9, indicators=["mockery"], severity="high"),
+            HorsemanDetection(horseman="defensiveness", confidence=0.7, indicators=["blame"], severity="medium"),
+            HorsemanDetection(horseman="stonewalling", confidence=0.6, indicators=["withdrawal"], severity="medium"),
+        ]
+        assert ThreatLevel.from_horsemen(horsemen) == ThreatLevel.CRITICAL
 
 
 class TestHorsemanDetection:
@@ -149,14 +213,13 @@ class TestAnalysisResult:
         result = AnalysisResult(
             safe=True,
             threat_level=ThreatLevel.SAFE,
-            toxicity_score=0.1,
             horsemen_detected=[],
             reasoning="Clean professional email",
             processing_time_ms=150,
         )
         assert result.safe is True
         assert result.threat_level == ThreatLevel.SAFE
-        assert result.toxicity_score == 0.1
+        assert result.is_toxic is False
         assert result.cached is False
 
     def test_create_toxic_result(self):
@@ -178,13 +241,13 @@ class TestAnalysisResult:
         result = AnalysisResult(
             safe=False,
             threat_level=ThreatLevel.HIGH,
-            toxicity_score=0.75,
             horsemen_detected=horsemen,
             reasoning="Contains contempt and personal attacks",
             processing_time_ms=200,
         )
         assert result.safe is False
         assert result.threat_level == ThreatLevel.HIGH
+        assert result.is_toxic is True
         assert len(result.horsemen_detected) == 2
 
     def test_detected_horsemen_names_filters_insignificant(self):
@@ -206,7 +269,6 @@ class TestAnalysisResult:
         result = AnalysisResult(
             safe=False,
             threat_level=ThreatLevel.HIGH,
-            toxicity_score=0.75,
             horsemen_detected=horsemen,
             reasoning="Test",
             processing_time_ms=100,
@@ -215,30 +277,27 @@ class TestAnalysisResult:
         assert names == ["contempt"]
         assert "criticism" not in names
 
-    def test_frozen_model(self):
-        """AnalysisResult should be immutable."""
-        result = AnalysisResult(
+    def test_is_toxic_property(self):
+        """is_toxic should be True when threat_level is not SAFE."""
+        safe_result = AnalysisResult(
             safe=True,
             threat_level=ThreatLevel.SAFE,
-            toxicity_score=0.1,
             horsemen_detected=[],
-            reasoning="Test",
+            reasoning="Clean",
             processing_time_ms=100,
         )
-        with pytest.raises(Exception):
-            result.toxicity_score = 0.9
+        assert safe_result.is_toxic is False
 
-    def test_toxicity_score_validation(self):
-        """Toxicity score must be between 0 and 1."""
-        with pytest.raises(ValueError):
-            AnalysisResult(
-                safe=True,
-                threat_level=ThreatLevel.SAFE,
-                toxicity_score=1.5,
-                horsemen_detected=[],
-                reasoning="Test",
-                processing_time_ms=100,
-            )
+        toxic_result = AnalysisResult(
+            safe=False,
+            threat_level=ThreatLevel.LOW,
+            horsemen_detected=[
+                HorsemanDetection(horseman="criticism", confidence=0.6, indicators=[], severity="low")
+            ],
+            reasoning="Minor toxicity",
+            processing_time_ms=100,
+        )
+        assert toxic_result.is_toxic is True
 
 
 class TestProtectionResult:
@@ -259,8 +318,10 @@ class TestProtectionResult:
         analysis = AnalysisResult(
             safe=False,
             threat_level=ThreatLevel.CRITICAL,
-            toxicity_score=0.95,
-            horsemen_detected=[],
+            horsemen_detected=[
+                HorsemanDetection(horseman="contempt", confidence=0.9, indicators=["mockery"], severity="high"),
+                HorsemanDetection(horseman="criticism", confidence=0.8, indicators=["attack"], severity="high"),
+            ],
             reasoning="Extreme toxicity",
             processing_time_ms=100,
         )
@@ -289,79 +350,67 @@ class TestProtectionAction:
 
 
 class TestDecideAction:
-    """Tests for decide_action function."""
+    """Tests for decide_action function with horsemen-based detection."""
 
-    def test_forward_clean_below_threshold(self):
-        """Scores below 0.30 should forward clean."""
-        assert decide_action(0.0) == ProtectionAction.FORWARD_CLEAN
-        assert decide_action(0.15) == ProtectionAction.FORWARD_CLEAN
-        assert decide_action(0.29) == ProtectionAction.FORWARD_CLEAN
+    def test_forward_clean_no_horsemen(self):
+        """No horsemen should forward clean."""
+        assert decide_action([]) == ProtectionAction.FORWARD_CLEAN
 
-    def test_forward_with_context(self):
-        """Scores 0.30-0.55 should forward with context."""
-        assert decide_action(0.30) == ProtectionAction.FORWARD_WITH_CONTEXT
-        assert decide_action(0.40) == ProtectionAction.FORWARD_WITH_CONTEXT
-        assert decide_action(0.54) == ProtectionAction.FORWARD_WITH_CONTEXT
+    def test_forward_clean_insignificant_horsemen(self):
+        """Only insignificant horsemen should forward clean."""
+        horsemen = [
+            HorsemanDetection(horseman="criticism", confidence=0.3, indicators=[], severity="low"),
+        ]
+        assert decide_action(horsemen) == ProtectionAction.FORWARD_CLEAN
 
-    def test_redact_harmful(self):
-        """Scores 0.55-0.70 should redact harmful content."""
-        assert decide_action(0.55) == ProtectionAction.REDACT_HARMFUL
-        assert decide_action(0.60) == ProtectionAction.REDACT_HARMFUL
-        assert decide_action(0.69) == ProtectionAction.REDACT_HARMFUL
+    def test_forward_with_context_single_horseman(self):
+        """Single non-contempt horseman should forward with context."""
+        horsemen = [
+            HorsemanDetection(horseman="criticism", confidence=0.6, indicators=["attack"], severity="medium"),
+        ]
+        assert decide_action(horsemen) == ProtectionAction.FORWARD_WITH_CONTEXT
 
-    def test_summarize_only(self):
-        """Scores 0.70-0.90 should summarize only."""
-        assert decide_action(0.70) == ProtectionAction.SUMMARIZE_ONLY
-        assert decide_action(0.80) == ProtectionAction.SUMMARIZE_ONLY
-        assert decide_action(0.89) == ProtectionAction.SUMMARIZE_ONLY
+    def test_redact_harmful_two_horsemen(self):
+        """Two non-contempt horsemen should redact harmful content."""
+        horsemen = [
+            HorsemanDetection(horseman="criticism", confidence=0.7, indicators=["attack"], severity="medium"),
+            HorsemanDetection(horseman="defensiveness", confidence=0.6, indicators=["blame"], severity="medium"),
+        ]
+        assert decide_action(horsemen) == ProtectionAction.REDACT_HARMFUL
 
-    def test_block_entirely(self):
-        """Scores 0.90+ should block entirely."""
-        assert decide_action(0.90) == ProtectionAction.BLOCK_ENTIRELY
-        assert decide_action(0.95) == ProtectionAction.BLOCK_ENTIRELY
-        assert decide_action(1.0) == ProtectionAction.BLOCK_ENTIRELY
+    def test_summarize_only_contempt_alone(self):
+        """Contempt alone should summarize only."""
+        horsemen = [
+            HorsemanDetection(horseman="contempt", confidence=0.8, indicators=["mockery"], severity="high"),
+        ]
+        assert decide_action(horsemen) == ProtectionAction.SUMMARIZE_ONLY
 
-    def test_custom_thresholds(self):
-        """Can use custom thresholds."""
-        custom = {
-            "forward_clean": 0.20,
-            "forward_context": 0.40,
-            "redact_harmful": 0.60,
-            "summarize_only": 0.80,
-        }
-        # Score 0.25 would be FORWARD_CLEAN with defaults, but FORWARD_WITH_CONTEXT with custom
-        assert decide_action(0.25, custom) == ProtectionAction.FORWARD_WITH_CONTEXT
-        assert decide_action(0.15, custom) == ProtectionAction.FORWARD_CLEAN
+    def test_summarize_only_three_horsemen(self):
+        """Three non-contempt horsemen should summarize only."""
+        horsemen = [
+            HorsemanDetection(horseman="criticism", confidence=0.7, indicators=["attack"], severity="medium"),
+            HorsemanDetection(horseman="defensiveness", confidence=0.6, indicators=["blame"], severity="medium"),
+            HorsemanDetection(horseman="stonewalling", confidence=0.6, indicators=["withdrawal"], severity="medium"),
+        ]
+        assert decide_action(horsemen) == ProtectionAction.SUMMARIZE_ONLY
 
-    def test_boundary_values(self):
-        """Test exact boundary values."""
-        # Exactly at threshold should fall into next category
-        assert decide_action(0.30) == ProtectionAction.FORWARD_WITH_CONTEXT
-        assert decide_action(0.55) == ProtectionAction.REDACT_HARMFUL
-        assert decide_action(0.70) == ProtectionAction.SUMMARIZE_ONLY
-        assert decide_action(0.90) == ProtectionAction.BLOCK_ENTIRELY
+    def test_block_entirely_contempt_plus_other(self):
+        """Contempt + any other horseman should block entirely."""
+        horsemen = [
+            HorsemanDetection(horseman="contempt", confidence=0.9, indicators=["mockery"], severity="high"),
+            HorsemanDetection(horseman="criticism", confidence=0.7, indicators=["attack"], severity="medium"),
+        ]
+        assert decide_action(horsemen) == ProtectionAction.BLOCK_ENTIRELY
 
-
-class TestDefaultThresholds:
-    """Tests for DEFAULT_THRESHOLDS configuration."""
-
-    def test_thresholds_are_ordered(self):
-        """Thresholds should be in ascending order."""
-        assert DEFAULT_THRESHOLDS["forward_clean"] < DEFAULT_THRESHOLDS["forward_context"]
-        assert DEFAULT_THRESHOLDS["forward_context"] < DEFAULT_THRESHOLDS["redact_harmful"]
-        assert DEFAULT_THRESHOLDS["redact_harmful"] < DEFAULT_THRESHOLDS["summarize_only"]
-
-    def test_thresholds_in_valid_range(self):
-        """All thresholds should be between 0 and 1."""
-        for name, value in DEFAULT_THRESHOLDS.items():
-            assert 0.0 <= value <= 1.0, f"Threshold {name} = {value} out of range"
-
-    def test_expected_values(self):
-        """Verify expected threshold values (recalibrated 2025-08-23)."""
-        assert DEFAULT_THRESHOLDS["forward_clean"] == 0.30
-        assert DEFAULT_THRESHOLDS["forward_context"] == 0.55
-        assert DEFAULT_THRESHOLDS["redact_harmful"] == 0.70
-        assert DEFAULT_THRESHOLDS["summarize_only"] == 0.90
+    def test_block_entirely_all_four(self):
+        """All four horsemen should block entirely."""
+        horsemen = [
+            HorsemanDetection(horseman="criticism", confidence=0.8, indicators=["attack"], severity="high"),
+            HorsemanDetection(horseman="contempt", confidence=0.9, indicators=["mockery"], severity="high"),
+            HorsemanDetection(horseman="defensiveness", confidence=0.7, indicators=["blame"], severity="medium"),
+            HorsemanDetection(horseman="stonewalling", confidence=0.6, indicators=["withdrawal"], severity="medium"),
+        ]
+        assert decide_action(horsemen) == ProtectionAction.BLOCK_ENTIRELY
 
 
 class TestGetActionDescription:
@@ -383,7 +432,8 @@ class TestPromptFormatting:
         prompt = format_analysis_prompt("Hello world", "test@example.com")
         assert "Hello world" in prompt
         assert "test@example.com" in prompt
-        assert "TOXICITY ASSESSMENT" in prompt
+        # Should focus on horsemen detection
+        assert "horsemen" in prompt.lower() or "contempt" in prompt.lower()
 
     def test_format_analysis_prompt_unknown_sender(self):
         """Analysis prompt handles missing sender."""
@@ -395,11 +445,9 @@ class TestPromptFormatting:
         """Rephrase prompt should include all parameters."""
         prompt = format_rephrase_prompt(
             content="You're terrible at this",
-            toxicity_score=0.75,
             detected_patterns="contempt, criticism",
             reasoning="Personal attack detected",
         )
         assert "You're terrible at this" in prompt
-        assert "0.75" in prompt
         assert "contempt, criticism" in prompt
         assert "Personal attack detected" in prompt

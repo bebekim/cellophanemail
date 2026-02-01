@@ -158,7 +158,7 @@ class TestComponentContracts:
         """
         # Create mock analyzer using dependency injection
         from src.cellophanemail.features.email_protection.mock_analyzer import MockAnalyzer
-        mock_analyzer = MockAnalyzer(default_toxicity=0.15)
+        mock_analyzer = MockAnalyzer()
         processor = InMemoryProcessor(use_llm=True, analyzer=mock_analyzer)
         
         # Create test email
@@ -179,20 +179,19 @@ class TestComponentContracts:
             "process_email must return ProcessingResult"
         
         # Contract: ProcessingResult must have required fields
-        required_fields = ['action', 'toxicity_score', 'requires_delivery', 
+        required_fields = ['action', 'threat_level', 'requires_delivery',
                          'delivery_targets', 'processed_content', 'processing_time_ms']
         for field in required_fields:
             assert hasattr(result, field), f"ProcessingResult missing field: {field}"
-        
+
         # Contract: action must be ProtectionAction enum
         assert isinstance(result.action, ProtectionAction), \
             "ProcessingResult.action must be ProtectionAction enum"
-        
-        # Contract: toxicity_score must be float between 0.0 and 1.0
-        assert isinstance(result.toxicity_score, float), \
-            "ProcessingResult.toxicity_score must be float"
-        assert 0.0 <= result.toxicity_score <= 1.0, \
-            "toxicity_score must be between 0.0 and 1.0"
+
+        # Contract: threat_level must be ThreatLevel enum
+        from analysis_engine import ThreatLevel
+        assert isinstance(result.threat_level, ThreatLevel), \
+            "ProcessingResult.threat_level must be ThreatLevel enum"
         
         # Contract: requires_delivery must be bool
         assert isinstance(result.requires_delivery, bool), \
@@ -206,9 +205,9 @@ class TestComponentContracts:
         assert mock_analyzer.call_count >= 1, \
             "LLM analyzer must be called during processing"
         
-        # Test that returned toxicity score matches mock
-        assert result.toxicity_score == 0.15, \
-            f"Expected toxicity 0.15, got {result.toxicity_score}"
+        # Test that returned threat_level is SAFE (default from mock)
+        assert result.threat_level == ThreatLevel.SAFE, \
+            f"Expected threat_level SAFE, got {result.threat_level}"
     
     def test_immediate_delivery_implements_delivery_contract(self):
         """

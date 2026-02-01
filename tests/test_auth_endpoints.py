@@ -2,20 +2,22 @@
 
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
+from litestar import Litestar
 from litestar.testing import TestClient
-from cellophanemail.app import create_app
+
+from cellophanemail.routes.auth import AuthController
 
 
 @pytest.fixture
 def test_client():
-    """Create test client for the app."""
-    app = create_app()
+    """Create test client with AuthController only (no env vars needed)."""
+    app = Litestar(route_handlers=[AuthController])
     return TestClient(app=app)
 
 
 class TestUserRegistration:
     """Test user registration endpoint."""
-    
+
     def test_register_user_success(self, test_client):
         """Test successful user registration."""
         with patch('cellophanemail.routes.auth.validate_email_unique', new=AsyncMock(return_value=True)):
@@ -25,33 +27,42 @@ class TestUserRegistration:
                 mock_user.id = "test-uuid"
                 mock_user.email = "test@example.com"
                 mock_user.username = "test123"
+                mock_user.first_name = "Test"
+                mock_user.last_name = "User"
                 mock_user.is_verified = False
                 mock_user.verification_token = "test-token"
+                mock_user.save = AsyncMock()
                 mock_create.return_value = mock_user
-                
-                response = test_client.post(
-                    "/auth/register",
-                    json={
-                        "email": "test@example.com",
-                        "password": "TestPass123!",
-                        "first_name": "Test",
-                        "last_name": "User"
-                    }
-                )
-                
-                assert response.status_code == 201
-                data = response.json()
-                assert data["status"] == "registered"
-                assert data["email"] == "test@example.com"
-                assert data["shield_address"].endswith("@cellophanemail.com")
-                assert "test" in data["shield_address"]
-                assert data["email_verified"] is False
-                
+
+                # Mock Stripe service
+                with patch('cellophanemail.routes.auth.StripeService') as mock_stripe_class:
+                    mock_stripe = mock_stripe_class.return_value
+                    mock_customer = MagicMock()
+                    mock_customer.id = "cus_test123"
+                    mock_stripe.create_customer = AsyncMock(return_value=mock_customer)
+
+                    response = test_client.post(
+                        "/api/v1/auth/register",
+                        json={
+                            "email": "test@example.com",
+                            "password": "TestPass123!",
+                            "first_name": "Test",
+                            "last_name": "User"
+                        }
+                    )
+
+                    assert response.status_code == 201
+                    data = response.json()
+                    assert data["status"] == "registered"
+                    assert data["email"] == "test@example.com"
+                    assert data["shield_address"].endswith("@cellophanemail.com")
+                    assert data["email_verified"] is False
+
     def test_register_user_duplicate_email(self, test_client):
         """Test registration with duplicate email."""
         with patch('cellophanemail.routes.auth.validate_email_unique', new=AsyncMock(return_value=False)):
             response = test_client.post(
-                "/auth/register",
+                "/api/v1/auth/register",
                 json={
                     "email": "existing@example.com",
                     "password": "TestPass123!",
@@ -59,16 +70,16 @@ class TestUserRegistration:
                     "last_name": "User"
                 }
             )
-            
+
             assert response.status_code == 400
             data = response.json()
             assert data["error"] == "Email already registered"
             assert data["field"] == "email"
-            
+
     def test_register_user_weak_password(self, test_client):
         """Test registration with weak password."""
         response = test_client.post(
-            "/auth/register",
+            "/api/v1/auth/register",
             json={
                 "email": "test@example.com",
                 "password": "weak",  # Too short, no uppercase, no digit
@@ -76,13 +87,13 @@ class TestUserRegistration:
                 "last_name": "User"
             }
         )
-        
+
         assert response.status_code == 400  # Validation error
-        
+
     def test_register_user_invalid_email(self, test_client):
         """Test registration with invalid email format."""
         response = test_client.post(
-            "/auth/register",
+            "/api/v1/auth/register",
             json={
                 "email": "not-an-email",
                 "password": "TestPass123!",
@@ -90,5 +101,5 @@ class TestUserRegistration:
                 "last_name": "User"
             }
         )
-        
+
         assert response.status_code == 400  # Validation error

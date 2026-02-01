@@ -221,7 +221,6 @@ class TestMessageAnalysisResponse:
             ],
             horsemen_types=["contempt"],
             has_horsemen=True,
-            toxicity_score=0.75,
             threat_level="high",
             reasoning="Contempt detected in message",
             processing_time_ms=1250,
@@ -232,7 +231,6 @@ class TestMessageAnalysisResponse:
         assert response.has_horsemen is True
         assert len(response.horsemen) == 1
         assert response.horsemen[0].type == "contempt"
-        assert response.toxicity_score == 0.75
         assert response.threat_level == "high"
         assert response.success is True
         assert response.error is None
@@ -244,7 +242,6 @@ class TestMessageAnalysisResponse:
             horsemen=[],
             horsemen_types=[],
             has_horsemen=False,
-            toxicity_score=0.1,
             threat_level="safe",
             reasoning="No concerning patterns detected",
             processing_time_ms=800,
@@ -253,7 +250,6 @@ class TestMessageAnalysisResponse:
 
         assert response.has_horsemen is False
         assert len(response.horsemen) == 0
-        assert response.toxicity_score == 0.1
         assert response.threat_level == "safe"
 
     def test_response_with_error(self):
@@ -263,7 +259,6 @@ class TestMessageAnalysisResponse:
             horsemen=[],
             horsemen_types=[],
             has_horsemen=False,
-            toxicity_score=0.0,
             threat_level="unknown",
             reasoning="",
             processing_time_ms=None,
@@ -288,7 +283,6 @@ class TestBatchAnalyzeResponse:
                     horsemen=[],
                     horsemen_types=[],
                     has_horsemen=False,
-                    toxicity_score=0.1,
                     threat_level="safe",
                     reasoning="Clean",
                     processing_time_ms=100,
@@ -306,7 +300,6 @@ class TestBatchAnalyzeResponse:
                     ],
                     horsemen_types=["criticism"],
                     has_horsemen=True,
-                    toxicity_score=0.6,
                     threat_level="medium",
                     reasoning="Criticism detected",
                     processing_time_ms=150,

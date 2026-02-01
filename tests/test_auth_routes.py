@@ -50,7 +50,7 @@ class TestAuthRegistration:
                     mock_user.save = AsyncMock()
 
                     async with AsyncTestClient(app=auth_app) as client:
-                        response = await client.post("/auth/register", json=registration_data)
+                        response = await client.post("/api/v1/auth/register", json=registration_data)
 
                         assert response.status_code == 201
                         data = response.json()
@@ -70,7 +70,7 @@ class TestAuthRegistration:
 
         with patch('cellophanemail.routes.auth.validate_email_unique', new_callable=AsyncMock, return_value=False):
             async with AsyncTestClient(app=auth_app) as client:
-                response = await client.post("/auth/register", json=registration_data)
+                response = await client.post("/api/v1/auth/register", json=registration_data)
 
                 assert response.status_code == 400
                 data = response.json()
@@ -87,7 +87,7 @@ class TestAuthRegistration:
         }
 
         async with AsyncTestClient(app=auth_app) as client:
-            response = await client.post("/auth/register", json=registration_data)
+            response = await client.post("/api/v1/auth/register", json=registration_data)
 
             assert response.status_code == 400
             # Pydantic validation should catch this
@@ -101,7 +101,7 @@ class TestAuthRegistration:
         }
 
         async with AsyncTestClient(app=auth_app) as client:
-            response = await client.post("/auth/register", json=registration_data)
+            response = await client.post("/api/v1/auth/register", json=registration_data)
 
             assert response.status_code == 400
 
@@ -141,7 +141,7 @@ class TestAuthLogin:
                     mock_dual_auth.side_effect = create_response_with_tokens
 
                     async with AsyncTestClient(app=auth_app) as client:
-                        response = await client.post("/auth/login", json=login_data)
+                        response = await client.post("/api/v1/auth/login", json=login_data)
 
                         assert response.status_code == 200
 
@@ -159,7 +159,7 @@ class TestAuthLogin:
             mock_objects.return_value.where.return_value = mock_where
 
             async with AsyncTestClient(app=auth_app) as client:
-                response = await client.post("/auth/login", json=login_data)
+                response = await client.post("/api/v1/auth/login", json=login_data)
 
                 assert response.status_code == 400
                 data = response.json()
@@ -186,7 +186,7 @@ class TestAuthLogin:
 
             with patch('cellophanemail.routes.auth.verify_password', return_value=False):
                 async with AsyncTestClient(app=auth_app) as client:
-                    response = await client.post("/auth/login", json=login_data)
+                    response = await client.post("/api/v1/auth/login", json=login_data)
 
                     assert response.status_code == 400
                     data = response.json()
@@ -217,7 +217,7 @@ class TestAuthProfile:
 
             async with AsyncTestClient(app=auth_app) as client:
                 response = await client.get(
-                    "/auth/profile",
+                    "/api/v1/auth/profile",
                     headers={"Authorization": f"Bearer {token}"}
                 )
 
@@ -229,7 +229,7 @@ class TestAuthProfile:
     async def test_get_profile_unauthenticated(self, auth_app):
         """Test getting profile without JWT fails."""
         async with AsyncTestClient(app=auth_app) as client:
-            response = await client.get("/auth/profile")
+            response = await client.get("/api/v1/auth/profile")
 
             # Without JWT token and guards in test environment
             # Litestar may return 500 or 200 with empty response
@@ -255,7 +255,7 @@ class TestAuthLogout:
             with patch('cellophanemail.services.jwt_service.blacklist_token') as mock_blacklist:
                 async with AsyncTestClient(app=auth_app) as client:
                     response = await client.post(
-                        "/auth/logout",
+                        "/api/v1/auth/logout",
                         headers={"Authorization": f"Bearer {token}"}
                     )
 
@@ -270,7 +270,7 @@ class TestAuthLogout:
     async def test_logout_without_token(self, auth_app):
         """Test logout without token still succeeds (graceful handling)."""
         async with AsyncTestClient(app=auth_app) as client:
-            response = await client.post("/auth/logout")
+            response = await client.post("/api/v1/auth/logout")
 
             assert response.status_code == 200
             data = response.json()
@@ -293,7 +293,7 @@ class TestAuthTokenRefresh:
 
             async with AsyncTestClient(app=auth_app) as client:
                 response = await client.post(
-                    "/auth/refresh",
+                    "/api/v1/auth/refresh",
                     json={"refresh_token": refresh_token}
                 )
 
@@ -307,7 +307,7 @@ class TestAuthTokenRefresh:
     async def test_refresh_token_missing(self, auth_app):
         """Test refresh fails without refresh token."""
         async with AsyncTestClient(app=auth_app) as client:
-            response = await client.post("/auth/refresh", json={})
+            response = await client.post("/api/v1/auth/refresh", json={})
 
             assert response.status_code == 400
             data = response.json()
@@ -324,7 +324,7 @@ class TestAuthTokenRefresh:
 
             async with AsyncTestClient(app=auth_app) as client:
                 response = await client.post(
-                    "/auth/refresh",
+                    "/api/v1/auth/refresh",
                     json={"refresh_token": "invalid_token"}
                 )
 

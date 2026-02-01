@@ -43,32 +43,21 @@ class TestMockAnalyzerDefaults:
     """Test MockAnalyzer default behavior."""
 
     @pytest.mark.asyncio
-    async def test_default_toxicity(self):
-        """Default toxicity should be 0.1."""
-        mock = MockAnalyzer()
-        result = await mock.analyze("test content")
-        assert result.toxicity_score == 0.1
-
-    @pytest.mark.asyncio
-    async def test_custom_default_toxicity(self):
-        """Custom default toxicity should be used."""
-        mock = MockAnalyzer(default_toxicity=0.5)
-        result = await mock.analyze("test content")
-        assert result.toxicity_score == 0.5
-
-    @pytest.mark.asyncio
     async def test_default_safe(self):
-        """Default safe should be True."""
+        """Default safe should be True with no horsemen."""
         mock = MockAnalyzer()
         result = await mock.analyze("test content")
         assert result.safe is True
+        assert result.threat_level == ThreatLevel.SAFE
+        assert len(result.horsemen_detected) == 0
 
     @pytest.mark.asyncio
     async def test_custom_default_safe(self):
         """Custom default safe should be used."""
         mock = MockAnalyzer(default_safe=False)
         result = await mock.analyze("test content")
-        assert result.safe is False
+        # When default_safe=False and no horsemen, threat_level is LOW
+        assert result.threat_level == ThreatLevel.LOW
 
     @pytest.mark.asyncio
     async def test_default_rephrase_prefix(self):
@@ -91,64 +80,90 @@ class TestMockAnalyzerCustomResponses:
     """Test MockAnalyzer custom response configuration."""
 
     @pytest.mark.asyncio
-    async def test_set_response_toxicity(self):
-        """set_response should configure toxicity for pattern."""
+    async def test_set_response_with_horsemen(self):
+        """set_response should configure horsemen for pattern."""
         mock = MockAnalyzer()
-        mock.set_response("toxic content", toxicity=0.8)
+        mock.set_response(
+            "toxic content",
+            horsemen=[
+                HorsemanDetection(horseman="contempt", confidence=0.8, indicators=["toxic"], severity="high"),
+            ],
+        )
 
         result = await mock.analyze("This has toxic content here")
-        assert result.toxicity_score == 0.8
+        assert result.threat_level == ThreatLevel.HIGH
+        assert len(result.horsemen_detected) == 1
 
     @pytest.mark.asyncio
     async def test_set_response_case_insensitive(self):
         """Pattern matching should be case-insensitive."""
         mock = MockAnalyzer()
-        mock.set_response("TOXIC", toxicity=0.9)
+        mock.set_response(
+            "TOXIC",
+            horsemen=[
+                HorsemanDetection(horseman="contempt", confidence=0.9, indicators=["TOXIC"], severity="high"),
+            ],
+        )
 
         result = await mock.analyze("this is toxic stuff")
-        assert result.toxicity_score == 0.9
+        assert result.threat_level == ThreatLevel.HIGH
 
     @pytest.mark.asyncio
     async def test_set_response_safe_flag(self):
         """set_response should configure safe flag."""
         mock = MockAnalyzer()
-        mock.set_response("danger", toxicity=0.7, safe=False)
+        mock.set_response(
+            "danger",
+            horsemen=[
+                HorsemanDetection(horseman="criticism", confidence=0.7, indicators=["danger"], severity="medium"),
+            ],
+            safe=False
+        )
 
         result = await mock.analyze("danger zone")
         assert result.safe is False
 
     @pytest.mark.asyncio
-    async def test_set_response_threat_level(self):
-        """set_response should configure custom threat level."""
+    async def test_set_response_contempt_is_high(self):
+        """Contempt alone should result in HIGH threat level."""
         mock = MockAnalyzer()
-        mock.set_response("critical", toxicity=0.6, threat_level=ThreatLevel.CRITICAL)
-
-        result = await mock.analyze("critical error")
-        assert result.threat_level == ThreatLevel.CRITICAL
-
-    @pytest.mark.asyncio
-    async def test_set_response_horsemen(self):
-        """set_response should configure horsemen detections."""
-        mock = MockAnalyzer()
-        horsemen = [
-            HorsemanDetection(
-                horseman="contempt",
-                confidence=0.8,
-                indicators=["mockery"],
-                severity="high",
-            )
-        ]
-        mock.set_response("mocking", toxicity=0.7, horsemen=horsemen)
+        mock.set_response(
+            "mocking",
+            horsemen=[
+                HorsemanDetection(
+                    horseman="contempt",
+                    confidence=0.8,
+                    indicators=["mockery"],
+                    severity="high",
+                )
+            ]
+        )
 
         result = await mock.analyze("mocking words")
+        assert result.threat_level == ThreatLevel.HIGH
         assert len(result.horsemen_detected) == 1
         assert result.horsemen_detected[0].horseman == "contempt"
+
+    @pytest.mark.asyncio
+    async def test_set_response_contempt_plus_other_is_critical(self):
+        """Contempt + another horseman should result in CRITICAL threat level."""
+        mock = MockAnalyzer()
+        mock.set_response(
+            "hateful",
+            horsemen=[
+                HorsemanDetection(horseman="contempt", confidence=0.9, indicators=["hate"], severity="high"),
+                HorsemanDetection(horseman="criticism", confidence=0.8, indicators=["attack"], severity="high"),
+            ]
+        )
+
+        result = await mock.analyze("hateful message")
+        assert result.threat_level == ThreatLevel.CRITICAL
 
     @pytest.mark.asyncio
     async def test_set_response_reasoning(self):
         """set_response should configure custom reasoning."""
         mock = MockAnalyzer()
-        mock.set_response("test", toxicity=0.5, reasoning="Custom reason")
+        mock.set_response("test", horsemen=[], reasoning="Custom reason")
 
         result = await mock.analyze("test message")
         assert result.reasoning == "Custom reason"
@@ -166,11 +181,14 @@ class TestMockAnalyzerCustomResponses:
     @pytest.mark.asyncio
     async def test_no_pattern_match_uses_default(self):
         """No pattern match should return defaults."""
-        mock = MockAnalyzer(default_toxicity=0.1)
-        mock.set_response("specific pattern", toxicity=0.9)
+        mock = MockAnalyzer()
+        mock.set_response(
+            "specific pattern",
+            horsemen=[HorsemanDetection(horseman="contempt", confidence=0.9, indicators=["specific"], severity="high")],
+        )
 
         result = await mock.analyze("different content")
-        assert result.toxicity_score == 0.1
+        assert result.threat_level == ThreatLevel.SAFE
 
 
 class TestMockAnalyzerCallHistory:
@@ -224,7 +242,7 @@ class TestMockAnalyzerCallHistory:
     async def test_reset_clears_history(self):
         """reset() should clear call history and custom responses."""
         mock = MockAnalyzer()
-        mock.set_response("pattern", toxicity=0.9)
+        mock.set_response("pattern", horsemen=[])
         await mock.analyze("test")
 
         mock.reset()
@@ -239,7 +257,6 @@ class TestFactoryFunctions:
     def test_create_clean_analyzer(self):
         """create_clean_analyzer should return safe defaults."""
         mock = create_clean_analyzer()
-        assert mock.default_toxicity == 0.05
         assert mock.default_safe is True
 
     def test_create_toxic_analyzer_has_patterns(self):
@@ -252,42 +269,42 @@ class TestFactoryFunctions:
         """create_toxic_analyzer should detect 'hate' as critical."""
         mock = create_toxic_analyzer()
         result = await mock.analyze("I hate you")
-        assert result.toxicity_score == 0.95
+        assert result.threat_level == ThreatLevel.CRITICAL
 
     @pytest.mark.asyncio
     async def test_create_toxic_analyzer_terrible_pattern(self):
         """create_toxic_analyzer should detect 'terrible' as medium."""
         mock = create_toxic_analyzer()
         result = await mock.analyze("This is terrible work")
-        assert result.toxicity_score == 0.65
+        assert result.threat_level == ThreatLevel.MEDIUM
 
     @pytest.mark.asyncio
     async def test_create_graduated_analyzer_minor(self):
         """create_graduated_analyzer should handle 'minor issue'."""
         mock = create_graduated_analyzer()
         result = await mock.analyze("This is a minor issue")
-        assert result.toxicity_score == 0.35
+        assert result.threat_level == ThreatLevel.LOW
 
     @pytest.mark.asyncio
     async def test_create_graduated_analyzer_moderate(self):
         """create_graduated_analyzer should handle 'moderate problem'."""
         mock = create_graduated_analyzer()
         result = await mock.analyze("This is a moderate problem")
-        assert result.toxicity_score == 0.65
+        assert result.threat_level == ThreatLevel.MEDIUM
 
     @pytest.mark.asyncio
     async def test_create_graduated_analyzer_serious(self):
         """create_graduated_analyzer should handle 'serious issue'."""
         mock = create_graduated_analyzer()
         result = await mock.analyze("This is a serious issue")
-        assert result.toxicity_score == 0.85
+        assert result.threat_level == ThreatLevel.HIGH
 
     @pytest.mark.asyncio
     async def test_create_graduated_analyzer_extreme(self):
         """create_graduated_analyzer should handle 'extreme threat'."""
         mock = create_graduated_analyzer()
         result = await mock.analyze("This is an extreme threat")
-        assert result.toxicity_score == 0.95
+        assert result.threat_level == ThreatLevel.CRITICAL
 
 
 class TestMockAnalyzerIntegration:
@@ -305,24 +322,42 @@ class TestMockAnalyzerIntegration:
                 severity="high",
             )
         ]
-        mock.set_response("test", toxicity=0.7, horsemen=horsemen)
+        mock.set_response("test", horsemen=horsemen)
 
         result = await mock.analyze("test content")
 
         assert "contempt" in result.detected_horsemen_names
 
     @pytest.mark.asyncio
-    async def test_threat_level_from_score_used(self):
-        """MockAnalyzer should use ThreatLevel.from_score by default."""
+    async def test_threat_level_from_horsemen_used(self):
+        """MockAnalyzer should use ThreatLevel.from_horsemen correctly."""
         mock = MockAnalyzer()
-        mock.set_response("low", toxicity=0.25)
-        mock.set_response("medium", toxicity=0.60)
-        mock.set_response("high", toxicity=0.85)
+
+        # LOW: single non-contempt horseman
+        mock.set_response(
+            "low",
+            horsemen=[HorsemanDetection(horseman="criticism", confidence=0.6, indicators=["low"], severity="low")]
+        )
+
+        # MEDIUM: 2 non-contempt horsemen
+        mock.set_response(
+            "medium",
+            horsemen=[
+                HorsemanDetection(horseman="criticism", confidence=0.7, indicators=["medium"], severity="medium"),
+                HorsemanDetection(horseman="defensiveness", confidence=0.6, indicators=["medium"], severity="medium"),
+            ]
+        )
+
+        # HIGH: contempt alone
+        mock.set_response(
+            "high",
+            horsemen=[HorsemanDetection(horseman="contempt", confidence=0.85, indicators=["high"], severity="high")]
+        )
 
         low = await mock.analyze("low content")
         medium = await mock.analyze("medium content")
         high = await mock.analyze("high content")
 
-        assert low.threat_level == ThreatLevel.SAFE
+        assert low.threat_level == ThreatLevel.LOW
         assert medium.threat_level == ThreatLevel.MEDIUM
         assert high.threat_level == ThreatLevel.HIGH
