@@ -1,9 +1,8 @@
 """Frontend page controllers for CellophoneMail."""
 
-from litestar import get
+from litestar import get, Request
 from litestar.controller import Controller
 from litestar.response import Template
-from litestar.request import Request
 from ..config.pricing import (
     get_plan_details,
     get_addon_pack_details,
