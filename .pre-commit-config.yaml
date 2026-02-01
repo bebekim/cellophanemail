@@ -1,0 +1,26 @@
+repos:
+  - repo: local
+    hooks:
+      - id: run-tests
+        name: Run Tests
+        entry: uv run pytest tests/ -x --tb=short -q
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
+      - id: check-route-test-sync
+        name: Check Route/Test Path Sync
+        entry: bash -c '
+          # If route files changed, warn about test updates
+          ROUTE_CHANGES=$(git diff --cached --name-only | grep -E "routes/.*\.py$" || true)
+          if [ -n "$ROUTE_CHANGES" ]; then
+            echo "⚠️  Route files changed: $ROUTE_CHANGES"
+            echo "   Verify corresponding tests are updated!"
+            echo "   Run: grep -r \"path =\" in changed files and match with tests/"
+          fi
+        '
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
