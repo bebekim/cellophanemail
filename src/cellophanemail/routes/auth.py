@@ -2,9 +2,8 @@
 
 from litestar import post, get, Response, Request
 from litestar.controller import Controller
-from litestar.response import Template, Redirect
-from litestar.security.jwt import JWTAuth
-from litestar.status_codes import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_302_FOUND
+from litestar.response import Template
+from litestar.status_codes import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
@@ -50,54 +49,10 @@ class UserLogin(BaseModel):
 
 
 class AuthController(Controller):
-    """Authentication and user management."""
+    """Authentication and user management API endpoints."""
 
     path = "/api/v1/auth"
-    
-    @get("/register")
-    async def register_form(self, request: Request) -> Template:
-        """Render the user registration form."""
-        return Template(
-            template_name="auth/register.html",
-            context={
-                "page_title": "Sign Up - CellophoneMail",
-                "meta_description": "Create your CellophoneMail account for AI-powered email protection",
-                "request": request,
-            }
-        )
-    
-    @get("/login") 
-    async def login_form(self, request: Request) -> Template:
-        """Render the user login form."""
-        return Template(
-            template_name="auth/login.html",
-            context={
-                "page_title": "Log In - CellophoneMail", 
-                "meta_description": "Sign in to your CellophoneMail account",
-                "request": request,
-            }
-        )
-    
-    @get("/signup-success")
-    async def signup_success(self, request: Request) -> Template:
-        """Render the signup success page."""
-        # Get user details from query parameters (passed from registration)
-        user_email = request.query_params.get("email", "")
-        shield_address = request.query_params.get("shield_address", "")
-        email_verified = request.query_params.get("verified", "false").lower() == "true"
-        
-        return Template(
-            template_name="auth/signup_success.html",
-            context={
-                "page_title": "Welcome to CellophoneMail - Registration Successful",
-                "meta_description": "Your CellophoneMail account has been created successfully",
-                "user_email": user_email,
-                "shield_address": shield_address,
-                "email_verified": email_verified,
-                "request": request,
-            }
-        )
-    
+
     @get("/dashboard", guards=[jwt_auth_required])
     async def dashboard(self, request: Request) -> Template:
         """Render the user dashboard."""
