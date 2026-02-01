@@ -3,6 +3,7 @@
 from litestar import get
 from litestar.controller import Controller
 from litestar.response import Template
+from litestar.request import Request
 from ..config.pricing import (
     get_plan_details,
     get_addon_pack_details,
@@ -12,9 +13,52 @@ from ..config.pricing import (
 
 class FrontendController(Controller):
     """Frontend page rendering controllers."""
-    
+
     path = "/"
-    
+
+    @get("/auth/register")
+    async def register_page(self, request: Request) -> Template:
+        """Render the user registration form."""
+        return Template(
+            template_name="auth/register.html",
+            context={
+                "page_title": "Sign Up - CellophoneMail",
+                "meta_description": "Create your CellophoneMail account for AI-powered email protection",
+                "request": request,
+            }
+        )
+
+    @get("/auth/login")
+    async def login_page(self, request: Request) -> Template:
+        """Render the user login form."""
+        return Template(
+            template_name="auth/login.html",
+            context={
+                "page_title": "Log In - CellophoneMail",
+                "meta_description": "Sign in to your CellophoneMail account",
+                "request": request,
+            }
+        )
+
+    @get("/auth/signup-success")
+    async def signup_success_page(self, request: Request) -> Template:
+        """Render the signup success page."""
+        user_email = request.query_params.get("email", "")
+        shield_address = request.query_params.get("shield_address", "")
+        email_verified = request.query_params.get("verified", "false").lower() == "true"
+
+        return Template(
+            template_name="auth/signup_success.html",
+            context={
+                "page_title": "Welcome to CellophoneMail - Registration Successful",
+                "meta_description": "Your CellophoneMail account has been created successfully",
+                "user_email": user_email,
+                "shield_address": shield_address,
+                "email_verified": email_verified,
+                "request": request,
+            }
+        )
+
     @get("/")
     async def landing_page(self) -> Template:
         """Render the landing page."""
