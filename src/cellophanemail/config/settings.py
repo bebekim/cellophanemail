@@ -1,18 +1,23 @@
 """CellophoneMail configuration settings."""
 
 from functools import lru_cache
-from typing import List
+from typing import List, Optional
 import os
 
 from pydantic import Field, field_validator, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _is_testing() -> bool:
+    """Check if we're in testing mode (before Settings is initialized)."""
+    return os.environ.get("TESTING", "").lower() == "true"
+
+
 class Settings(BaseSettings):
     """CellophoneMail application settings."""
-    
+
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=".env.test" if _is_testing() else ".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
@@ -23,15 +28,17 @@ class Settings(BaseSettings):
     host: str = Field(default="127.0.0.1", description="Host to bind to")
     port: int = Field(default=8000, description="Port to bind to")
     secret_key: str = Field(
+        default="test-secret-key-only-for-testing-not-production-use-32chars" if _is_testing() else "",
         description="Secret key for JWT and sessions (min 32 chars, no defaults)"
     )
     encryption_key: str = Field(
         default="",
         description="Encryption key for sensitive data"
     )
-    
+
     # Database settings
     database_url: str = Field(
+        default="postgresql://test:test@localhost:5432/test" if _is_testing() else "",
         description="Database URL for Piccolo ORM (no default password allowed)"
     )
     database_echo: bool = Field(default=False, description="Echo SQL queries")
@@ -56,7 +63,10 @@ class Settings(BaseSettings):
         return self.cors_allowed_origins
     
     # AI Service settings (preserve from protectedtex)
-    anthropic_api_key: str = Field(description="Anthropic API key")
+    anthropic_api_key: str = Field(
+        default="sk-ant-api03-test-key-for-testing-only-not-real" if _is_testing() else "",
+        description="Anthropic API key"
+    )
     upstage_api_key: str = Field(default="", description="Upstage API key")
     ai_provider: str = Field(default="anthropic", description="AI provider (anthropic, upstage)")
     ai_model: str = Field(
@@ -89,7 +99,11 @@ class Settings(BaseSettings):
     postmark_from_email: str = Field(default="", description="Default from email for Postmark")
     postmark_from_address: str = Field(default="", description="Default from address for Postmark (alias for from_email)")
     postmark_dry_run: bool = Field(default=False, description="Enable Postmark dry-run mode")
-    
+    postmark_log_dry_run: bool = Field(default=False, description="Log dry-run emails to file")
+
+    # Test mode settings
+    cellophanemail_test_mode: bool = Field(default=False, description="Enable test mode")
+
     # Plugin settings
     enabled_plugins: str = Field(
         default="smtp,postmark",
@@ -116,6 +130,9 @@ class Settings(BaseSettings):
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
         """Validate secret key strength."""
+        # Skip strict validation in test mode
+        if _is_testing():
+            return v
         if not v or len(v.strip()) == 0:
             raise ValueError("SECRET_KEY is required and cannot be empty")
         if len(v) < 32:
@@ -133,6 +150,9 @@ class Settings(BaseSettings):
     @classmethod
     def validate_database_url(cls, v: str) -> str:
         """Validate database URL is provided."""
+        # Skip validation in test mode
+        if _is_testing():
+            return v
         if not v or len(v.strip()) == 0:
             raise ValueError("DATABASE_URL is required and cannot be empty")
         return v
@@ -141,6 +161,9 @@ class Settings(BaseSettings):
     @classmethod
     def validate_anthropic_api_key(cls, v: str) -> str:
         """Validate Anthropic API key format."""
+        # Skip validation in test mode
+        if _is_testing():
+            return v
         if not v or len(v.strip()) == 0:
             raise ValueError("ANTHROPIC_API_KEY is required for AI features")
         if not v.startswith('sk-ant-api03-'):

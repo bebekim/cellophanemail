@@ -196,8 +196,9 @@ def create_app() -> Litestar:
     return app
 
 
-# Entry point for uvicorn
-app = create_app()
+# Entry point for uvicorn - use factory pattern
+# uvicorn calls create_app() directly via "cellophanemail.app:create_app"
+# This avoids module-level app creation which breaks test imports
 
 
 if __name__ == "__main__":
