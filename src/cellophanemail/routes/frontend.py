@@ -97,8 +97,8 @@ class FrontendController(Controller):
         """Render the pricing page."""
         # Get plan details from pricing config
         starter_plan = get_plan_details("starter")
-        professional_plan = get_plan_details("professional") 
-        unlimited_plan = get_plan_details("unlimited")
+        plus_plan = get_plan_details("plus")
+        professional_plan = get_plan_details("professional")
         addon_pack = get_addon_pack_details()
         
         return Template(
@@ -143,20 +143,18 @@ class FrontendController(Controller):
                         "popular": True
                     },
                     {
-                        "id": "unlimited",
-                        "name": "Unlimited", 
-                        "price": unlimited_plan["price"],
+                        "id": "plus",
+                        "name": "Plus",
+                        "price": plus_plan["price"],
                         "period": "month",
-                        "email_limit": None,
-                        "description": unlimited_plan["description"],
+                        "email_limit": plus_plan["emails"],
+                        "description": plus_plan["description"],
                         "features": [
-                            "Unlimited emails",
-                            "Unlimited shield addresses",
-                            "Advanced Four Horsemen analytics",
-                            "Watch list management", 
-                            "Priority support",
-                            "Custom domains",
-                            "API access"
+                            f"{plus_plan['emails']} emails per month",
+                            "2 shield email addresses",
+                            "Four Horsemen AI analysis",
+                            "Watch list management",
+                            "Priority support"
                         ],
                         "cta": "Start Free Trial",
                         "popular": False
