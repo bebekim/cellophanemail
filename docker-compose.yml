@@ -1,5 +1,5 @@
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (dev + test databases)
   db:
     image: postgres:15-alpine
     container_name: cellophanemail_db
@@ -11,6 +11,7 @@ services:
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     networks:
       - cellophanemail
     healthcheck:
@@ -35,12 +36,18 @@ services:
       timeout: 5s
       retries: 3
 
-  # Database Migrations
+  # Database Migrations (dev)
   migrate:
-    build: .
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
     container_name: cellophanemail_migrate
+    user: "${UID:-1000}:${GID:-1000}"
     environment:
       - DATABASE_URL=postgresql://cellophane_user:docker_dev_pass_2024@db:5432/cellophanemail
+      - UV_CACHE_DIR=/tmp/uv-cache
     volumes:
       - .:/app
     depends_on:
@@ -51,14 +58,46 @@ services:
     command: ["uv", "run", "piccolo", "migrations", "forwards", "all"]
     restart: "no"
 
+  # Database Migrations (test)
+  migrate-test:
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    container_name: cellophanemail_migrate_test
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      - DATABASE_URL=postgresql://cellophane_user:docker_dev_pass_2024@db:5432/cellophanemail_test
+      - UV_CACHE_DIR=/tmp/uv-cache
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - cellophanemail
+    command: ["uv", "run", "piccolo", "migrations", "forwards", "all"]
+    restart: "no"
+    profiles:
+      - test
+
   # Litestar API Server
   app:
-    build: .
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
     container_name: cellophanemail_app
+    user: "${UID:-1000}:${GID:-1000}"
     environment:
       - DEBUG=1
       - DATABASE_URL=postgresql://cellophane_user:docker_dev_pass_2024@db:5432/cellophanemail
       - REDIS_URL=redis://redis:6379/0
+      - UV_CACHE_DIR=/tmp/uv-cache
     ports:
       - "8000:8000"
     volumes:
@@ -77,13 +116,19 @@ services:
 
   # SMTP Email Server
   smtp:
-    build: .
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
     container_name: cellophanemail_smtp
+    user: "${UID:-1000}:${GID:-1000}"
     environment:
       - DEBUG=1
       - SMTP_HOST=0.0.0.0
       - SMTP_PORT=2525
       - DATABASE_URL=postgresql://cellophane_user:docker_dev_pass_2024@db:5432/cellophanemail
+      - UV_CACHE_DIR=/tmp/uv-cache
     ports:
       - "2525:2525"
     volumes:
@@ -104,6 +149,38 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  # arq Worker (Redis-backed async job queue)
+  arq-worker:
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    container_name: cellophanemail_arq_worker
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      - DEBUG=1
+      - DATABASE_URL=postgresql://cellophane_user:docker_dev_pass_2024@db:5432/cellophanemail
+      - REDIS_URL=redis://redis:6379/0
+      - UV_CACHE_DIR=/tmp/uv-cache
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - cellophanemail
+    env_file:
+      - .env.docker
+    profiles:
+      - cache
+    command: ["uv", "run", "arq", "cellophanemail.jobs.settings.WorkerSettings"]
+    restart: unless-stopped
 
 volumes:
   postgres_data:
