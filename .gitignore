@@ -9,11 +9,15 @@ wheels/
 # Virtual environments
 .venv
 
-# Environment files
+# Environment files (secrets)
 .env
 .env.local
+.env.dev
+.env.docker
+.env.test
 .env.*.local
 !.env.example
+!.env.docker.example
 !.env.test.example
 
 # IDE and editor files
@@ -35,6 +39,8 @@ Thumbs.db
 # Logs
 *.log
 logs/
+protection_logs/
+*_dry_run_*.jsonl
 
 # Database
 *.db
@@ -43,5 +49,10 @@ logs/
 
 # Claude Code
 .claude/
-.env
-.env.dev
+
+# Coverage
+.coverage
+htmlcov/
+
+# Internal notes
+thoughts/
