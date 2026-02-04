@@ -5,6 +5,14 @@ import sys
 import pytest
 from typing import AsyncGenerator
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env.test for testing
+env_path = Path(__file__).parent.parent / ".env.test"
+load_dotenv(env_path)
+
+# Set testing mode
+os.environ["TESTING"] = "true"
 
 # Add src directory to path for imports
 src_path = Path(__file__).parent.parent / "src"
