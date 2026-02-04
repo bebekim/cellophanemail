@@ -311,8 +311,6 @@ dependencies = [
     { name = "httpx" },
     { name = "jinja2" },
     { name = "litestar", extra = ["standard"] },
-    { name = "llama-cpp-python" },
-    { name = "ollama" },
     { name = "passlib", extra = ["bcrypt"] },
     { name = "piccolo", extra = ["postgres"] },
     { name = "postmark" },
@@ -336,6 +334,10 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest-cov" },
 ]
+local-llm = [
+    { name = "llama-cpp-python" },
+    { name = "ollama" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -356,9 +358,9 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.26.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "litestar", extras = ["standard"], specifier = ">=2.16.0" },
-    { name = "llama-cpp-python", specifier = ">=0.3.2" },
+    { name = "llama-cpp-python", marker = "extra == 'local-llm'", specifier = ">=0.3.2" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
-    { name = "ollama", specifier = ">=0.5.3" },
+    { name = "ollama", marker = "extra == 'local-llm'", specifier = ">=0.5.3" },
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
     { name = "piccolo", extras = ["postgres"], specifier = ">=1.28.0" },
     { name = "postmark", specifier = ">=1.0.0" },
@@ -377,7 +379,7 @@ requires-dist = [
     { name = "stripe", specifier = ">=7.8.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24.0" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["dev", "local-llm"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest-asyncio", specifier = ">=1.1.0" }]
