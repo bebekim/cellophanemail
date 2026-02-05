@@ -42,7 +42,7 @@ class TestEndToEndPrivacyValidation:
         
         # Mock all external services to prevent real API calls
         # Use environment variable to make factory create mock analyzer
-        with patch.dict(os.environ, {'TESTING': 'true'}, clear=False), \
+        with patch.dict(os.environ, {'STAGING': 'true'}, clear=False), \
              patch('cellophanemail.core.email_delivery.factory.EmailSenderFactory.create_sender') as mock_sender_factory, \
              patch('cellophanemail.features.email_protection.storage.ProtectionLogStorage.log_protection_decision') as mock_db_log:
             

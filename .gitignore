@@ -14,11 +14,11 @@ wheels/
 .env.local
 .env.dev
 .env.docker
-.env.test
+.env.staging
 .env.*.local
 !.env.example
 !.env.docker.example
-!.env.test.example
+!.env.staging.example
 
 # IDE and editor files
 .vscode/

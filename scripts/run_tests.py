@@ -28,7 +28,7 @@ def run_code_tests():
     
     # Ensure dry-run mode
     os.environ['POSTMARK_DRY_RUN'] = 'true'
-    os.environ['CELLOPHANEMAIL_TEST_MODE'] = 'true'
+    os.environ['CELLOPHANEMAIL_STAGING_MODE'] = 'true'
     
     test_file = project_root / "tests" / "test_integration_minimal.py"
     

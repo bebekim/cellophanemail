@@ -14,8 +14,8 @@ The Postmark provider now supports a **dry-run mode** that simulates sending ema
 # Enable dry-run for Postmark
 export POSTMARK_DRY_RUN=true
 
-# Or enable test mode for all providers
-export CELLOPHANEMAIL_TEST_MODE=true
+# Or enable staging mode for all providers
+export CELLOPHANEMAIL_STAGING_MODE=true
 
 # Optional: Log dry-run emails to file
 export POSTMARK_LOG_DRY_RUN=true
@@ -33,14 +33,14 @@ config = ProviderConfig(
 )
 ```
 
-### Method 3: Use Test Environment File
+### Method 3: Use Staging Environment File
 ```bash
-# Copy the test environment template
-cp .env.test .env
+# Copy the staging environment template
+cp .env.staging .env
 
 # This automatically enables:
 # - POSTMARK_DRY_RUN=true
-# - CELLOPHANEMAIL_TEST_MODE=true
+# - CELLOPHANEMAIL_STAGING_MODE=true
 # - Local SMTP as fallback
 ```
 
@@ -133,7 +133,7 @@ config = ProviderConfig(
 ## Safety Tips
 
 1. **Always test with dry-run first** when developing new features
-2. **Use test environment files** (`.env.test`) for development
+2. **Use staging environment files** (`.env.staging`) for development
 3. **Monitor the logs** - look for [DRY-RUN] indicators
 4. **Check quota regularly** in Postmark dashboard
 5. **Use SMTP for integration tests** to avoid Postmark entirely

@@ -1,10 +1,17 @@
 """Tests for configuration security validation."""
 
+import os
 import pytest
 from pydantic import ValidationError
 from unittest.mock import patch
 from cellophanemail.config.settings import Settings
 from cellophanemail.app import validate_configuration
+
+
+@pytest.fixture(autouse=True)
+def enable_strict_validation(monkeypatch):
+    """Enable strict validation for all tests in this module."""
+    monkeypatch.setenv("STRICT_VALIDATION", "true")
 
 
 class TestSettingsValidation:

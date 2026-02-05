@@ -27,7 +27,7 @@ jobs:
 
       - name: Run tests
         env:
-          TESTING: "true"
+          STAGING: "true"
         run: uv run pytest tests/ -v --tb=short
 
       - name: Run type check

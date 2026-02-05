@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Force dry-run mode for tests
 os.environ['POSTMARK_DRY_RUN'] = 'true'
-os.environ['CELLOPHANEMAIL_TEST_MODE'] = 'true'
+os.environ['CELLOPHANEMAIL_STAGING_MODE'] = 'true'
 
 from cellophanemail.providers.contracts import EmailMessage, ProviderConfig
 from cellophanemail.providers.postmark.provider import PostmarkProvider

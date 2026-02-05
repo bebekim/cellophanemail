@@ -40,7 +40,7 @@ class PostmarkProvider(EmailProvider):
         self.dry_run = (
             config.config.get('dry_run', False) or 
             os.getenv('POSTMARK_DRY_RUN', '').lower() in ['true', '1', 'yes'] or
-            os.getenv('CELLOPHANEMAIL_TEST_MODE', '').lower() in ['true', '1', 'yes']
+            os.getenv('CELLOPHANEMAIL_STAGING_MODE', '').lower() in ['true', '1', 'yes']
         )
         
         if self.dry_run:

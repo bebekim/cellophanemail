@@ -342,7 +342,7 @@ Tests disable CSRF for simplicity:
 ```python
 # tests/conftest.py
 class TestConfig:
-    TESTING = True
+    STAGING = True
     WTF_CSRF_ENABLED = False  # Disable CSRF for tests
 ```
 

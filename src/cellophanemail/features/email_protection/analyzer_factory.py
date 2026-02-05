@@ -1,6 +1,6 @@
 """
 Factory for creating email analyzers based on environment configuration.
-Supports Anthropic (production), Llama (privacy), and Mock (testing).
+Supports Anthropic (production), Llama (privacy), and Mock (staging).
 """
 
 import os
@@ -16,7 +16,7 @@ class AnalyzerFactory:
     Factory for creating appropriate email analyzer based on environment.
     
     Selection logic:
-    - TESTING=true → MockAnalyzer (no API calls)
+    - STAGING=true → MockAnalyzer (no API calls)
     - PRIVACY_MODE=true → LlamaAnalyzer (local model)  
     - Default → EmailToxicityAnalyzer (Anthropic API)
     """
@@ -38,8 +38,8 @@ class AnalyzerFactory:
             return AnalyzerFactory._create_by_type(analyzer_type, temperature)
             
         # Auto-detect based on environment
-        if os.getenv("TESTING", "").lower() in ("true", "1", "yes"):
-            logger.info("Creating MockAnalyzer for testing environment")
+        if os.getenv("STAGING", "").lower() in ("true", "1", "yes"):
+            logger.info("Creating MockAnalyzer for staging environment")
             return AnalyzerFactory._create_mock_analyzer()
             
         if os.getenv("PRIVACY_MODE", "").lower() in ("true", "1", "yes"):
@@ -66,7 +66,7 @@ class AnalyzerFactory:
     
     @staticmethod
     def _create_mock_analyzer() -> IEmailAnalyzer:
-        """Create mock analyzer for testing."""
+        """Create mock analyzer for staging."""
         from .mock_analyzer import create_toxic_analyzer
         return create_toxic_analyzer()
     
@@ -91,12 +91,12 @@ class AnalyzerFactory:
     def detect_environment() -> str:
         """
         Detect current environment for logging/debugging.
-        
+
         Returns:
-            Environment name: "testing", "privacy", or "production"
+            Environment name: "staging", "privacy", or "production"
         """
-        if os.getenv("TESTING", "").lower() in ("true", "1", "yes"):
-            return "testing"
+        if os.getenv("STAGING", "").lower() in ("true", "1", "yes"):
+            return "staging"
         elif os.getenv("PRIVACY_MODE", "").lower() in ("true", "1", "yes"):
             return "privacy"
         else:
@@ -104,8 +104,8 @@ class AnalyzerFactory:
 
 
 # Convenience functions for specific scenarios
-def create_for_testing() -> IEmailAnalyzer:
-    """Create mock analyzer specifically for testing."""
+def create_for_staging() -> IEmailAnalyzer:
+    """Create mock analyzer specifically for staging."""
     return AnalyzerFactory.create_analyzer(analyzer_type="mock")
 
 

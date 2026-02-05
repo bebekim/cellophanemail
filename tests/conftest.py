@@ -14,9 +14,9 @@ load_dotenv(env_path)
 # Set testing mode
 os.environ["TESTING"] = "true"
 
-# CRITICAL: Set testing environment BEFORE any app imports
+# CRITICAL: Set staging environment BEFORE any app imports
 # This must happen before settings.py is imported
-os.environ["TESTING"] = "true"
+os.environ["STAGING"] = "true"
 
 # Add src directory to path for imports
 src_path = Path(__file__).parent.parent / "src"
@@ -30,8 +30,8 @@ from cellophanemail.app import create_app
 @pytest.fixture(scope="function")
 async def test_client() -> AsyncGenerator[AsyncTestClient, None]:
     """Create a test client for the application."""
-    # Ensure testing flag is set before creating app
-    os.environ["TESTING"] = "true"
+    # Ensure staging flag is set before creating app
+    os.environ["STAGING"] = "true"
     
     # Clear settings cache to ensure testing flag is picked up
     from cellophanemail.config.settings import get_settings
@@ -43,14 +43,14 @@ async def test_client() -> AsyncGenerator[AsyncTestClient, None]:
 
 
 @pytest.fixture(autouse=True)
-def set_testing_env():
-    """Automatically set testing environment for all tests."""
-    # TESTING is already set at module level, but ensure it stays set
-    os.environ["TESTING"] = "true"
+def set_staging_env():
+    """Automatically set staging environment for all tests."""
+    # STAGING is already set at module level, but ensure it stays set
+    os.environ["STAGING"] = "true"
 
-    # Clear settings cache to ensure testing flag is picked up
+    # Clear settings cache to ensure staging flag is picked up
     from cellophanemail.config.settings import get_settings
     get_settings.cache_clear()
 
     yield
-    # Don't delete TESTING - keep it for the whole test session
+    # Don't delete STAGING - keep it for the whole test session

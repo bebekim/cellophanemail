@@ -8,27 +8,38 @@ from pydantic import Field, field_validator, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def _is_testing() -> bool:
-    """Check if we're in testing mode (before Settings is initialized)."""
-    return os.environ.get("TESTING", "").lower() == "true"
+def _is_staging() -> bool:
+    """Check if we're in staging mode (before Settings is initialized)."""
+    return os.environ.get("STAGING", "").lower() == "true"
+
+
+def _skip_validation() -> bool:
+    """Check if validation should be skipped.
+
+    Validation is skipped in staging mode UNLESS STRICT_VALIDATION is set.
+    This allows security tests to verify validation logic works.
+    """
+    if os.environ.get("STRICT_VALIDATION", "").lower() == "true":
+        return False  # Never skip if strict validation requested
+    return _is_staging()
 
 
 class Settings(BaseSettings):
     """CellophoneMail application settings."""
 
     model_config = SettingsConfigDict(
-        env_file=".env.test" if _is_testing() else ".env",
+        env_file=".env.staging" if _is_staging() else ".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
     
     # App settings
     debug: bool = Field(default=False, description="Debug mode")
-    testing: bool = Field(default=False, description="Testing mode")
+    staging: bool = Field(default=False, description="Staging mode")
     host: str = Field(default="127.0.0.1", description="Host to bind to")
     port: int = Field(default=8000, description="Port to bind to")
     secret_key: str = Field(
-        default="test-secret-key-only-for-testing-not-production-use-32chars" if _is_testing() else "",
+        default="staging-secret-key-only-for-staging-not-production-32ch" if _is_staging() else "",
         description="Secret key for JWT and sessions (min 32 chars, no defaults)"
     )
     encryption_key: str = Field(
@@ -38,7 +49,7 @@ class Settings(BaseSettings):
 
     # Database settings
     database_url: str = Field(
-        default="postgresql://test:test@localhost:5432/test" if _is_testing() else "",
+        default="postgresql://staging:staging@localhost:5432/staging" if _is_staging() else "",
         description="Database URL for Piccolo ORM (no default password allowed)"
     )
     database_echo: bool = Field(default=False, description="Echo SQL queries")
@@ -64,7 +75,7 @@ class Settings(BaseSettings):
     
     # AI Service settings (preserve from protectedtex)
     anthropic_api_key: str = Field(
-        default="sk-ant-api03-test-key-for-testing-only-not-real" if _is_testing() else "",
+        default="sk-ant-api03-staging-key-for-staging-only-not-real" if _is_staging() else "",
         description="Anthropic API key"
     )
     upstage_api_key: str = Field(default="", description="Upstage API key")
@@ -101,8 +112,8 @@ class Settings(BaseSettings):
     postmark_dry_run: bool = Field(default=False, description="Enable Postmark dry-run mode")
     postmark_log_dry_run: bool = Field(default=False, description="Log dry-run emails to file")
 
-    # Test mode settings
-    cellophanemail_test_mode: bool = Field(default=False, description="Enable test mode")
+    # Staging mode settings
+    cellophanemail_staging_mode: bool = Field(default=False, description="Enable staging mode")
 
     # Plugin settings
     enabled_plugins: str = Field(
@@ -130,8 +141,8 @@ class Settings(BaseSettings):
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
         """Validate secret key strength."""
-        # Skip strict validation in test mode
-        if _is_testing():
+        # Skip strict validation in test mode (unless STRICT_VALIDATION=true)
+        if _skip_validation():
             return v
         if not v or len(v.strip()) == 0:
             raise ValueError("SECRET_KEY is required and cannot be empty")
@@ -150,8 +161,8 @@ class Settings(BaseSettings):
     @classmethod
     def validate_database_url(cls, v: str) -> str:
         """Validate database URL is provided."""
-        # Skip validation in test mode
-        if _is_testing():
+        # Skip validation in test mode (unless STRICT_VALIDATION=true)
+        if _skip_validation():
             return v
         if not v or len(v.strip()) == 0:
             raise ValueError("DATABASE_URL is required and cannot be empty")
@@ -161,8 +172,8 @@ class Settings(BaseSettings):
     @classmethod
     def validate_anthropic_api_key(cls, v: str) -> str:
         """Validate Anthropic API key format."""
-        # Skip validation in test mode
-        if _is_testing():
+        # Skip validation in test mode (unless STRICT_VALIDATION=true)
+        if _skip_validation():
             return v
         if not v or len(v.strip()) == 0:
             raise ValueError("ANTHROPIC_API_KEY is required for AI features")
@@ -175,7 +186,7 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         """Check if running in production mode."""
-        return not self.debug and not self.testing
+        return not self.debug and not self.staging
 
     @property
     def piccolo_config(self):

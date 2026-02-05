@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Force dry-run mode
 os.environ['POSTMARK_DRY_RUN'] = 'true'
-os.environ['CELLOPHANEMAIL_TEST_MODE'] = 'true'
+os.environ['CELLOPHANEMAIL_STAGING_MODE'] = 'true'
 
 from cellophanemail.providers.postmark.provider import PostmarkProvider
 from cellophanemail.providers.contracts import EmailMessage, ProviderConfig
@@ -125,7 +125,7 @@ async def _test_with_registry():
 if __name__ == "__main__":
     print("\n🔧 Environment Configuration:")
     print(f"  POSTMARK_DRY_RUN: {os.getenv('POSTMARK_DRY_RUN', 'not set')}")
-    print(f"  CELLOPHANEMAIL_TEST_MODE: {os.getenv('CELLOPHANEMAIL_TEST_MODE', 'not set')}")
+    print(f"  CELLOPHANEMAIL_STAGING_MODE: {os.getenv('CELLOPHANEMAIL_STAGING_MODE', 'not set')}")
     print(f"  POSTMARK_LOG_DRY_RUN: {os.getenv('POSTMARK_LOG_DRY_RUN', 'not set')}")
     print()
     
