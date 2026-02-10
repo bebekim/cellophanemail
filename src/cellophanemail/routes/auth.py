@@ -1,9 +1,11 @@
 """Authentication and user management endpoints."""
 
+import logging
 from litestar import post, get, Response, Request
+from litestar.connection import ASGIConnection
 from litestar.controller import Controller
 from litestar.response import Template
-from litestar.status_codes import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
+from litestar.status_codes import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_429_TOO_MANY_REQUESTS
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
@@ -14,7 +16,38 @@ from ..services.auth_service import (
 )
 from ..services.stripe_service import StripeService
 from ..config.settings import get_settings
-from ..middleware.jwt_auth import jwt_auth_required
+from ..middleware.jwt_auth import jwt_auth_required, create_auth_response
+from ..features.security.rate_limiter import RateLimiter
+
+logger = logging.getLogger(__name__)
+
+# Auth rate limiter instance
+_auth_rate_limiter = RateLimiter()
+_auth_rate_limiter.configure_limit("auth:register", requests_per_minute=5)
+_auth_rate_limiter.configure_limit("auth:login", requests_per_minute=10)
+_auth_rate_limiter.configure_limit("auth:refresh", requests_per_minute=20)
+
+
+def _get_client_ip(connection: ASGIConnection) -> str:
+    """Extract client IP from connection, respecting X-Forwarded-For."""
+    forwarded = connection.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    client = connection.scope.get("client")
+    return client[0] if client else "unknown"
+
+
+def _check_auth_rate_limit(connection: ASGIConnection, endpoint: str) -> None:
+    """Check rate limit for an auth endpoint, raise 429 if exceeded."""
+    client_ip = _get_client_ip(connection)
+    result = _auth_rate_limiter.check_limit(client_ip, endpoint)
+    if not result.allowed:
+        from litestar.exceptions import HTTPException
+        raise HTTPException(
+            status_code=HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many requests. Retry after {result.retry_after_seconds} seconds.",
+            headers={"Retry-After": str(result.retry_after_seconds)}
+        )
 
 
 class UserRegistration(BaseModel):
@@ -109,10 +142,12 @@ class AuthController(Controller):
     @post("/register", status_code=HTTP_201_CREATED)
     async def register_user(
         self,
+        request: Request,
         data: UserRegistration
     ) -> Response[Dict[str, Any]]:
         """Register new user account."""
-        
+        _check_auth_rate_limit(request, "auth:register")
+
         # Validate email uniqueness
         is_unique = await validate_email_unique(data.email)
         if not is_unique:
@@ -146,19 +181,14 @@ class AuthController(Controller):
             await user.save()
 
             # TODO: Send welcome/verification email via Postmark
-            # TODO: Generate JWT token for auto-login
+
+            # Generate tokens for auto-login after registration
+            auth_data = await create_auth_response(user)
+            auth_data["shield_address"] = f"{user.username}@cellophanemail.com"
+            auth_data["message"] = "Registration successful. Use /billing/create-checkout to start your subscription."
 
             return Response(
-                content={
-                    "status": "registered",
-                    "user_id": str(user.id),
-                    "email": user.email,
-                    "shield_address": f"{user.username}@cellophanemail.com",
-                    "stripe_customer_id": customer.id,
-                    "email_verified": user.is_verified,
-                    "verification_token": user.verification_token,
-                    "message": "Registration successful. Use /billing/create-checkout to start your subscription."
-                },
+                content=auth_data,
                 status_code=HTTP_201_CREATED
             )
             
@@ -174,9 +204,12 @@ class AuthController(Controller):
     @post("/login")
     async def login_user(
         self,
-        data: UserLogin  
+        request: Request,
+        data: UserLogin
     ) -> Response[Dict[str, Any]]:
         """Authenticate user login with hybrid cookie + token strategy."""
+        _check_auth_rate_limit(request, "auth:login")
+
         from cellophanemail.models.user import User
         from cellophanemail.middleware.jwt_auth import create_dual_auth_response
         
@@ -300,11 +333,14 @@ class AuthController(Controller):
     @post("/refresh")
     async def refresh_token(
         self,
+        request: Request,
         data: Dict[str, str]
     ) -> Response[Dict[str, Any]]:
         """Refresh access token using refresh token."""
+        _check_auth_rate_limit(request, "auth:refresh")
+
         from cellophanemail.services.jwt_service import refresh_access_token, JWTError
-        
+
         refresh_token = data.get("refresh_token")
         
         if not refresh_token:

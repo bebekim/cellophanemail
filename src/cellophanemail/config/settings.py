@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # App settings
     debug: bool = Field(default=False, description="Debug mode")
     staging: bool = Field(default=False, description="Staging mode")
+    base_url: str = Field(
+        default="http://localhost:8000",
+        description="Base URL for the application (used for webhook URLs)"
+    )
     host: str = Field(default="127.0.0.1", description="Host to bind to")
     port: int = Field(default=8000, description="Port to bind to")
     secret_key: str = Field(
