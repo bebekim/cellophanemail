@@ -49,16 +49,32 @@ class TestAuthRegistration:
                     # Mock user.save()
                     mock_user.save = AsyncMock()
 
-                    async with AsyncTestClient(app=auth_app) as client:
-                        response = await client.post("/api/v1/auth/register", json=registration_data)
+                    # Mock create_auth_response to return tokens
+                    with patch('cellophanemail.routes.auth.create_auth_response', new_callable=AsyncMock) as mock_auth_response:
+                        mock_auth_response.return_value = {
+                            "access_token": "mock_access_token",
+                            "refresh_token": "mock_refresh_token",
+                            "token_type": "Bearer",
+                            "expires_in": 900,
+                            "user": {
+                                "id": "new-user-123",
+                                "email": registration_data["email"],
+                                "username": "newuser",
+                                "role": "user",
+                                "is_verified": False
+                            }
+                        }
 
-                        assert response.status_code == 201
-                        data = response.json()
-                        assert data["status"] == "registered"
-                        assert data["email"] == registration_data["email"]
-                        assert "shield_address" in data
-                        assert "@cellophanemail.com" in data["shield_address"]
-                        assert data["stripe_customer_id"] == "cus_stripe123"
+                        async with AsyncTestClient(app=auth_app) as client:
+                            response = await client.post("/api/v1/auth/register", json=registration_data)
+
+                            assert response.status_code == 201
+                            data = response.json()
+                            assert "access_token" in data
+                            assert "refresh_token" in data
+                            assert "shield_address" in data
+                            assert "@cellophanemail.com" in data["shield_address"]
+                            assert data["message"] is not None
 
     @pytest.mark.asyncio
     async def test_register_duplicate_email(self, auth_app):
