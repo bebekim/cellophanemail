@@ -1,0 +1,26 @@
+#!/bin/bash
+# Run smoke tests against staging (or a custom URL)
+set -euo pipefail
+
+STAGING_URL="${STAGING_URL:-https://cellophanemail-staging.up.railway.app}"
+MODE="${1:-smoke}"
+
+echo "=== Staging Smoke Tests ==="
+echo "URL: $STAGING_URL"
+echo "Mode: $MODE"
+echo ""
+
+case "$MODE" in
+    smoke)
+        STAGING_URL="$STAGING_URL" uv run pytest tests/e2e/smoke/ -v
+        ;;
+    all)
+        STAGING_URL="$STAGING_URL" uv run pytest tests/e2e/ -v
+        ;;
+    *)
+        echo "Usage: bin/test-staging [smoke|all]"
+        echo "  smoke  - Health + public page checks (default)"
+        echo "  all    - All E2E tests"
+        exit 1
+        ;;
+esac

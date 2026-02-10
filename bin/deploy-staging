@@ -1,0 +1,51 @@
+#!/bin/bash
+# Deploy CellophoneMail to Railway staging environment
+set -euo pipefail
+
+DRY_RUN=false
+if [[ "${1:-}" == "--dry-run" ]]; then
+    DRY_RUN=true
+    echo "[DRY RUN] Commands will be printed but not executed"
+    echo ""
+fi
+
+run_cmd() {
+    if $DRY_RUN; then
+        echo "  [dry-run] $*"
+    else
+        "$@"
+    fi
+}
+
+echo "=== Deploy to STAGING ==="
+echo ""
+
+# Check for uncommitted changes
+if ! git diff --quiet HEAD 2>/dev/null; then
+    echo "WARNING: You have uncommitted changes."
+    echo "  Consider committing before deploying."
+    echo ""
+    read -rp "Continue anyway? [y/N] " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo "Aborted."
+        exit 1
+    fi
+fi
+
+# Show what we're deploying
+echo "Branch: $(git rev-parse --abbrev-ref HEAD)"
+echo "Commit: $(git log --oneline -1)"
+echo ""
+
+# Switch to staging environment and deploy
+echo "Switching to staging environment..."
+run_cmd railway environment staging
+
+echo "Deploying..."
+run_cmd railway up --detach
+
+echo ""
+echo "Staging deploy initiated."
+echo "URL: https://cellophanemail-staging.up.railway.app"
+echo ""
+echo "Run 'bin/test-staging' to verify the deployment."

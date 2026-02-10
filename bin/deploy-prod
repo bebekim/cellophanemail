@@ -1,0 +1,59 @@
+#!/bin/bash
+# Deploy CellophoneMail to Railway production environment
+set -euo pipefail
+
+DRY_RUN=false
+if [[ "${1:-}" == "--dry-run" ]]; then
+    DRY_RUN=true
+    echo "[DRY RUN] Commands will be printed but not executed"
+    echo ""
+fi
+
+run_cmd() {
+    if $DRY_RUN; then
+        echo "  [dry-run] $*"
+    else
+        "$@"
+    fi
+}
+
+echo "=== Deploy to PRODUCTION ==="
+echo ""
+
+# Check for uncommitted changes
+if ! git diff --quiet HEAD 2>/dev/null; then
+    echo "WARNING: You have uncommitted changes."
+    echo "  Consider committing before deploying."
+    echo ""
+    read -rp "Continue anyway? [y/N] " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo "Aborted."
+        exit 1
+    fi
+fi
+
+# Show what we're deploying
+echo "Branch: $(git rev-parse --abbrev-ref HEAD)"
+echo "Commit: $(git log --oneline -1)"
+echo ""
+
+# Require explicit confirmation
+echo "You are about to deploy to PRODUCTION."
+read -rp "Type 'deploy' to confirm: " confirm
+if [[ "$confirm" != "deploy" ]]; then
+    echo "Aborted."
+    exit 1
+fi
+
+echo ""
+
+# Switch to production environment and deploy
+echo "Switching to production environment..."
+run_cmd railway environment production
+
+echo "Deploying..."
+run_cmd railway up --detach
+
+echo ""
+echo "Production deploy initiated."
+echo "URL: https://cellophanemail-production.up.railway.app"

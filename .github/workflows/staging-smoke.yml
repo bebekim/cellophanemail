@@ -1,0 +1,33 @@
+name: Staging Smoke Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_url:
+        description: "Staging URL to test against"
+        required: false
+        default: "https://cellophanemail-staging.up.railway.app"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run smoke tests
+        env:
+          STAGING_URL: ${{ github.event.inputs.staging_url }}
+        run: uv run pytest tests/e2e/smoke/ -v --tb=short

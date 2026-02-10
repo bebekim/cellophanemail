@@ -1,0 +1,71 @@
+#!/bin/bash
+# Set staging-specific Railway variables
+set -euo pipefail
+
+DRY_RUN=false
+if [[ "${1:-}" == "--dry-run" ]]; then
+    DRY_RUN=true
+    echo "[DRY RUN] Commands will be printed but not executed"
+    echo ""
+fi
+
+run_cmd() {
+    if $DRY_RUN; then
+        echo "  [dry-run] $*"
+    else
+        "$@"
+    fi
+}
+
+echo "=== Set Staging-Specific Railway Variables ==="
+echo ""
+
+# Fixed staging values
+STAGING_VARS=(
+    "STAGING=true"
+    "CELLOPHANEMAIL_STAGING_MODE=true"
+    "DEBUG=true"
+    "POSTMARK_DRY_RUN=true"
+    "POSTMARK_LOG_DRY_RUN=true"
+    "CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8000,https://cellophanemail-staging.up.railway.app"
+    "BASE_URL=https://cellophanemail-staging.up.railway.app"
+)
+
+for var in "${STAGING_VARS[@]}"; do
+    name="${var%%=*}"
+    echo "  Setting $name ..."
+    run_cmd railway variables --environment staging --set "$var"
+done
+
+# Auto-generate keys
+echo ""
+echo "Generating SECRET_KEY and ENCRYPTION_KEY..."
+SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+
+run_cmd railway variables --environment staging --set "SECRET_KEY=$SECRET_KEY"
+run_cmd railway variables --environment staging --set "ENCRYPTION_KEY=$ENCRYPTION_KEY"
+
+# Prompt for DATABASE_URL
+echo ""
+read -rp "Staging DATABASE_URL (leave blank to use Railway Postgres plugin): " db_url
+if [[ -n "$db_url" ]]; then
+    run_cmd railway variables --environment staging --set "DATABASE_URL=$db_url"
+else
+    echo "  Skipped - ensure Railway Postgres plugin provides DATABASE_URL"
+fi
+
+# Prompt for Stripe test keys
+echo ""
+read -rp "Stripe TEST API key (sk_test_...): " stripe_key
+if [[ -n "$stripe_key" ]]; then
+    run_cmd railway variables --environment staging --set "STRIPE_API_KEY=$stripe_key"
+fi
+
+read -rp "Stripe TEST webhook secret (whsec_test_...): " stripe_wh
+if [[ -n "$stripe_wh" ]]; then
+    run_cmd railway variables --environment staging --set "STRIPE_WEBHOOK_SECRET=$stripe_wh"
+fi
+
+echo ""
+echo "Staging variables configured."

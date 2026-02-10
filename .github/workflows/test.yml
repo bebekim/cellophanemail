@@ -28,7 +28,7 @@ jobs:
       - name: Run tests
         env:
           STAGING: "true"
-        run: uv run pytest tests/ -v --tb=short
+        run: uv run pytest tests/ -v --tb=short --ignore=tests/e2e
 
       - name: Run type check
         run: uv run mypy src/cellophanemail --ignore-missing-imports || true

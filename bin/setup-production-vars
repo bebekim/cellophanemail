@@ -1,0 +1,96 @@
+#!/bin/bash
+# Set production-specific Railway variables
+set -euo pipefail
+
+DRY_RUN=false
+if [[ "${1:-}" == "--dry-run" ]]; then
+    DRY_RUN=true
+    echo "[DRY RUN] Commands will be printed but not executed"
+    echo ""
+fi
+
+run_cmd() {
+    if $DRY_RUN; then
+        echo "  [dry-run] $*"
+    else
+        "$@"
+    fi
+}
+
+echo "=== Set Production-Specific Railway Variables ==="
+echo ""
+echo "WARNING: This sets PRODUCTION variables."
+read -rp "Type 'yes' to confirm: " confirm
+if [[ "$confirm" != "yes" ]]; then
+    echo "Aborted."
+    exit 1
+fi
+echo ""
+
+# Fixed production values
+PROD_VARS=(
+    "STAGING=false"
+    "CELLOPHANEMAIL_STAGING_MODE=false"
+    "DEBUG=false"
+    "POSTMARK_DRY_RUN=false"
+    "POSTMARK_LOG_DRY_RUN=false"
+    "CORS_ALLOWED_ORIGINS=https://cellophanemail.com,https://www.cellophanemail.com,https://cellophanemail-production.up.railway.app"
+    "BASE_URL=https://cellophanemail.com"
+)
+
+for var in "${PROD_VARS[@]}"; do
+    name="${var%%=*}"
+    echo "  Setting $name ..."
+    run_cmd railway variables --environment production --set "$var"
+done
+
+# Auto-generate keys
+echo ""
+echo "Generating SECRET_KEY and ENCRYPTION_KEY..."
+SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+
+run_cmd railway variables --environment production --set "SECRET_KEY=$SECRET_KEY"
+run_cmd railway variables --environment production --set "ENCRYPTION_KEY=$ENCRYPTION_KEY"
+
+# Prompt for DATABASE_URL
+echo ""
+read -rp "Production DATABASE_URL: " db_url
+if [[ -n "$db_url" ]]; then
+    run_cmd railway variables --environment production --set "DATABASE_URL=$db_url"
+else
+    echo "  Skipped - ensure Railway Postgres plugin provides DATABASE_URL"
+fi
+
+# Prompt for Postmark token
+echo ""
+read -rp "Postmark API token: " postmark_token
+if [[ -n "$postmark_token" ]]; then
+    run_cmd railway variables --environment production --set "POSTMARK_API_TOKEN=$postmark_token"
+fi
+
+# Prompt for Stripe LIVE keys with prefix validation
+echo ""
+read -rp "Stripe LIVE API key (sk_live_...): " stripe_key
+if [[ -n "$stripe_key" ]]; then
+    if [[ ! "$stripe_key" == sk_live_* ]]; then
+        echo "ERROR: Production Stripe key must start with 'sk_live_'"
+        exit 1
+    fi
+    run_cmd railway variables --environment production --set "STRIPE_API_KEY=$stripe_key"
+fi
+
+read -rp "Stripe LIVE webhook secret (whsec_...): " stripe_wh
+if [[ -n "$stripe_wh" ]]; then
+    run_cmd railway variables --environment production --set "STRIPE_WEBHOOK_SECRET=$stripe_wh"
+fi
+
+# Prompt for Anthropic key
+echo ""
+read -rp "Anthropic API key (sk-ant-api03-...): " anthropic_key
+if [[ -n "$anthropic_key" ]]; then
+    run_cmd railway variables --environment production --set "ANTHROPIC_API_KEY=$anthropic_key"
+fi
+
+echo ""
+echo "Production variables configured."

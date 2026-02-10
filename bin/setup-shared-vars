@@ -1,0 +1,50 @@
+#!/bin/bash
+# Set shared Railway variables in both staging and production
+set -euo pipefail
+
+DRY_RUN=false
+if [[ "${1:-}" == "--dry-run" ]]; then
+    DRY_RUN=true
+    echo "[DRY RUN] Commands will be printed but not executed"
+    echo ""
+fi
+
+run_cmd() {
+    if $DRY_RUN; then
+        echo "  [dry-run] $*"
+    else
+        "$@"
+    fi
+}
+
+echo "=== Set Shared Railway Variables ==="
+echo "These values will be set in BOTH staging and production."
+echo ""
+
+SHARED_VARS=(
+    "AI_PROVIDER=anthropic"
+    "AI_MODEL=claude-sonnet-4-5-20250929"
+    "AI_MAX_TOKENS=1000"
+    "SMTP_DOMAIN=cellophanemail.com"
+    "SMTP_HOST=smtp.gmail.com"
+    "SMTP_PORT=587"
+    "SMTP_USE_TLS=true"
+    "OUTBOUND_SMTP_HOST=smtp.gmail.com"
+    "OUTBOUND_SMTP_PORT=587"
+    "OUTBOUND_SMTP_USE_TLS=true"
+    "EMAIL_DELIVERY_METHOD=postmark"
+    "ENABLED_PLUGINS=smtp"
+    "HOST=0.0.0.0"
+    "LLM_ANALYZER_MODE=privacy"
+    "PRIVACY_SAFE_LOGGING=true"
+)
+
+for var in "${SHARED_VARS[@]}"; do
+    name="${var%%=*}"
+    echo "  Setting $name ..."
+    run_cmd railway variables --environment staging --set "$var"
+    run_cmd railway variables --environment production --set "$var"
+done
+
+echo ""
+echo "Shared variables set in both environments."
