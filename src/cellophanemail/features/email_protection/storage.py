@@ -54,7 +54,7 @@ class ProtectionLogStorage:
                 "decision": {
                     "forwarded": result.should_forward,
                     "threat_level": result.analysis.threat_level.value if result.analysis else None,
-                    "toxicity_score": result.analysis.toxicity_score if result.analysis else 0.0,
+                    "toxicity_score": result.analysis.threat_level.value if result.analysis else "safe",
                     "horsemen_detected": [
                         h.horseman for h in (result.analysis.horsemen_detected if result.analysis else [])
                     ],

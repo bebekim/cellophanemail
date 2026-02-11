@@ -202,7 +202,8 @@ async def test_in_memory_processor_clean_email():
     from src.cellophanemail.features.email_protection.in_memory_processor import InMemoryProcessor
     from src.cellophanemail.features.email_protection.ephemeral_email import EphemeralEmail
     from src.cellophanemail.features.email_protection.graduated_decision_maker import ProtectionAction
-    
+    from analysis_engine import ThreatLevel
+
     processor = InMemoryProcessor()
     email = EphemeralEmail(
         message_id="clean-1",
@@ -218,13 +219,13 @@ async def test_in_memory_processor_clean_email():
     
     # Test result structure
     assert hasattr(result, 'action')
-    assert hasattr(result, 'toxicity_score')
+    assert hasattr(result, 'threat_level')
     assert hasattr(result, 'requires_delivery')
     assert hasattr(result, 'delivery_targets')
-    
+
     # Test clean email behavior
     assert result.action == ProtectionAction.FORWARD_CLEAN
-    assert result.toxicity_score < 0.30
+    assert result.threat_level == ThreatLevel.SAFE
     assert result.requires_delivery == True
     assert result.delivery_targets == ["user@example.com"]
 
@@ -235,7 +236,8 @@ async def test_in_memory_processor_toxic_email():
     from src.cellophanemail.features.email_protection.in_memory_processor import InMemoryProcessor
     from src.cellophanemail.features.email_protection.ephemeral_email import EphemeralEmail
     from src.cellophanemail.features.email_protection.graduated_decision_maker import ProtectionAction
-    
+    from analysis_engine import ThreatLevel
+
     # Create mock analyzer with predictable response for toxic content
     from src.cellophanemail.features.email_protection.mock_analyzer import create_toxic_analyzer
     mock_analyzer = create_toxic_analyzer()
@@ -252,10 +254,10 @@ async def test_in_memory_processor_toxic_email():
     )
     
     result = await processor.process_email(email)
-    
-    # Test toxic email behavior - mock analyzer matched "hate" first (0.95 toxicity)
-    assert result.action == ProtectionAction.BLOCK_ENTIRELY  # 0.95 toxicity 
-    assert result.toxicity_score == 0.95  # Predictable mock response
+
+    # Test toxic email behavior - mock analyzer matched "hate" (contempt + criticism = CRITICAL)
+    assert result.action == ProtectionAction.BLOCK_ENTIRELY  # CRITICAL threat level
+    assert result.threat_level == ThreatLevel.CRITICAL  # Predictable mock response
     assert result.requires_delivery == False  # Blocked entirely
     assert result.delivery_targets == []
 
@@ -273,9 +275,10 @@ async def test_immediate_delivery_success():
     delivery_manager = ImmediateDeliveryManager()
     
     # Create a processing result that requires delivery
+    from analysis_engine import ThreatLevel
     processing_result = ProcessingResult(
         action=ProtectionAction.FORWARD_CLEAN,
-        toxicity_score=0.1,
+        threat_level=ThreatLevel.SAFE,
         requires_delivery=True,
         delivery_targets=["user@example.com"],
         processed_content="Meeting at 2pm",
@@ -317,9 +320,10 @@ async def test_immediate_delivery_retry_on_failure():
     delivery_manager = ImmediateDeliveryManager(max_retries=3)
     
     # Create a processing result that may fail delivery (not FORWARD_CLEAN)
+    from analysis_engine import ThreatLevel
     processing_result = ProcessingResult(
         action=ProtectionAction.FORWARD_WITH_CONTEXT,
-        toxicity_score=0.35,
+        threat_level=ThreatLevel.LOW,
         requires_delivery=True,
         delivery_targets=["user@example.com"],
         processed_content="Some content with context",
@@ -356,9 +360,10 @@ async def test_immediate_delivery_no_delivery_required():
     delivery_manager = ImmediateDeliveryManager()
     
     # Create a processing result that doesn't require delivery (BLOCK_ENTIRELY)
+    from analysis_engine import ThreatLevel
     processing_result = ProcessingResult(
         action=ProtectionAction.BLOCK_ENTIRELY,
-        toxicity_score=0.95,
+        threat_level=ThreatLevel.CRITICAL,
         requires_delivery=False,
         delivery_targets=[],
         processed_content="",

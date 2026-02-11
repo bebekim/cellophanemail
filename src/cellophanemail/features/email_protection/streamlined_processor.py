@@ -123,7 +123,6 @@ class StreamlinedEmailProtectionProcessor:
             legacy_analysis = AnalysisResult(
                 safe=consolidated_analysis.safe,
                 threat_level=consolidated_analysis.threat_level,
-                toxicity_score=consolidated_analysis.toxicity_score,
                 horsemen_detected=consolidated_analysis.horsemen_detected,
                 reasoning=consolidated_analysis.reasoning,
                 processing_time_ms=consolidated_analysis.processing_time_ms,
@@ -157,7 +156,7 @@ class StreamlinedEmailProtectionProcessor:
         # Performance logging
         total_time = int((datetime.now() - start_time).total_seconds() * 1000)
         logger.info(f"Email {email.message_id} processed in {total_time}ms: "
-                   f"action={protection_decision.action}, toxicity={consolidated_analysis.toxicity_score:.3f}")
+                   f"action={protection_decision.action}, threat_level={consolidated_analysis.threat_level.value}")
         
         return result
     
@@ -195,14 +194,8 @@ class StreamlinedEmailProtectionProcessor:
         
         # Conservative fallback - assume medium toxicity to trigger protection
         return EmailAnalysis(
-            toxicity_score=0.6,  # Medium toxicity -> REDACT_HARMFUL
             threat_level=ThreatLevel.MEDIUM,
             safe=False,
-            fact_ratio=0.5,
-            communication_manner="unknown",
-            personal_attacks=[],
-            manipulation_tactics=[],
-            implicit_threats=[],
             horsemen_detected=[],
             reasoning=f"LLM analysis failed: {error_reason}. Using conservative fallback.",
             confidence=0.3,

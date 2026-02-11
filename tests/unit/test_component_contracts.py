@@ -14,6 +14,7 @@ from cellophanemail.features.email_protection.ephemeral_email import EphemeralEm
 from cellophanemail.features.email_protection.in_memory_processor import InMemoryProcessor, ProcessingResult
 from cellophanemail.features.email_protection.immediate_delivery import ImmediateDeliveryManager, DeliveryResult
 from cellophanemail.features.email_protection.graduated_decision_maker import ProtectionAction
+from analysis_engine.types import ThreatLevel
 
 
 # Contract Interfaces (should be defined formally)
@@ -233,7 +234,7 @@ class TestComponentContracts:
         # Create test processing result
         processing_result = ProcessingResult(
             action=ProtectionAction.FORWARD_CLEAN,
-            toxicity_score=0.1,
+            threat_level=ThreatLevel.SAFE,
             requires_delivery=True,
             delivery_targets=["user@example.com"],
             processed_content="Clean test content",

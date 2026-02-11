@@ -36,13 +36,12 @@ class TestNoContentLogging:
         # Create a protection result
         analysis = AnalysisResult(
             safe=True,
-            toxicity_score=0.1,
             threat_level=ThreatLevel.SAFE,
             horsemen_detected=[],
             reasoning="Test analysis",
             processing_time_ms=100
         )
-        
+
         result = ProtectionResult(
             should_forward=True,
             analysis=analysis,
@@ -51,27 +50,27 @@ class TestNoContentLogging:
             logged_at=datetime.now(),
             message_id=email.message_id
         )
-        
+
         # Create storage with temp directory
         with tempfile.TemporaryDirectory() as temp_dir:
             storage = ProtectionLogStorage(log_dir=temp_dir)
-            
+
             # Act - Log the protection decision
             await storage.log_protection_decision(email, result)
-            
+
             # Assert - Check the log file
             log_files = list(Path(temp_dir).glob("*.jsonl"))
             assert len(log_files) == 1, "Should create one log file"
-            
+
             with open(log_files[0], 'r') as f:
                 log_content = f.read()
                 log_entry = json.loads(log_content)
-                
+
                 # CRITICAL: Subject should NOT be in the log
                 assert "subject" not in log_entry, "Email subject should NEVER be logged"
                 assert "CONFIDENTIAL" not in log_content, "Sensitive content found in log"
                 assert "Salary Review" not in log_content, "Private information leaked to log"
-    
+
     @pytest.mark.asyncio
     async def test_storage_never_logs_email_addresses(self):
         """
@@ -86,10 +85,9 @@ class TestNoContentLogging:
             text_body="Content",
             shield_address="shield123@cellophanemail.com"
         )
-        
+
         analysis = AnalysisResult(
             safe=True,
-            toxicity_score=0.1,
             threat_level=ThreatLevel.SAFE,
             horsemen_detected=[],
             reasoning="Test analysis",
@@ -139,7 +137,6 @@ class TestNoContentLogging:
         
         analysis = AnalysisResult(
             safe=False,
-            toxicity_score=0.25,
             threat_level=ThreatLevel.MEDIUM,
             horsemen_detected=[],
             reasoning="Test analysis",
@@ -171,7 +168,7 @@ class TestNoContentLogging:
                 assert "message_id" in log_entry
                 assert "decision" in log_entry
                 assert log_entry["decision"]["forwarded"] == False
-                assert log_entry["decision"]["toxicity_score"] == 0.25
+                assert log_entry["decision"]["threat_level"] == "medium"
                 
                 # These content fields should NOT be present
                 assert "subject" not in log_entry
@@ -197,13 +194,12 @@ class TestNoContentLogging:
         
         analysis = AnalysisResult(
             safe=True,
-            toxicity_score=0.1,
             threat_level=ThreatLevel.SAFE,
             horsemen_detected=[],
             reasoning="Test analysis",
             processing_time_ms=100
         )
-        
+
         result = ProtectionResult(
             should_forward=True,
             analysis=analysis,
@@ -212,18 +208,18 @@ class TestNoContentLogging:
             logged_at=datetime.now(),
             message_id=email.message_id
         )
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             storage = ProtectionLogStorage(log_dir=temp_dir)
-            
+
             # Act
             await storage.log_protection_decision(email, result)
-            
+
             # Assert
             log_files = list(Path(temp_dir).glob("*.jsonl"))
             with open(log_files[0], 'r') as f:
                 log_entry = json.loads(f.read())
-                
+
                 # Message ID should be hashed or anonymized
                 if "message_id" in log_entry:
                     # Should not contain the real message ID directly

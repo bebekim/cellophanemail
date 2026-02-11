@@ -266,7 +266,6 @@ Important: Be precise with toxicity scoring. Professional emails should score < 
         return AnalysisResult(
             safe=consolidated.safe,
             threat_level=consolidated.threat_level,
-            toxicity_score=consolidated.toxicity_score,
             horsemen_detected=consolidated.horsemen_detected,
             reasoning=consolidated.reasoning,
             processing_time_ms=consolidated.processing_time_ms,

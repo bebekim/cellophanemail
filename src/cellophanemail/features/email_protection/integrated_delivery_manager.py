@@ -33,7 +33,7 @@ class EnhancedDeliveryResult:
     success: bool
     attempts: int
     protection_action: ProtectionAction
-    toxicity_score: float
+    threat_level_value: str
     error_message: Optional[str] = None
     delivery_time_ms: Optional[int] = None
     email_sender_used: Optional[str] = None
@@ -98,7 +98,7 @@ class IntegratedDeliveryManager(DeliveryManagerInterface):
                 success=True,
                 attempts=0,
                 protection_action=processing_result.action,
-                toxicity_score=processing_result.toxicity_score,
+                threat_level_value=processing_result.threat_level.value,
                 error_message="No delivery required",
                 email_sender_used=self.config.sender_type
             )
@@ -112,7 +112,7 @@ class IntegratedDeliveryManager(DeliveryManagerInterface):
                 success=False,
                 attempts=0,
                 protection_action=processing_result.action,
-                toxicity_score=processing_result.toxicity_score,
+                threat_level_value=processing_result.threat_level.value,
                 error_message=f"Email composition failed: {str(e)}",
                 email_sender_used=self.config.sender_type
             )
@@ -134,7 +134,7 @@ class IntegratedDeliveryManager(DeliveryManagerInterface):
                         success=True,
                         attempts=attempts,
                         protection_action=processing_result.action,
-                        toxicity_score=processing_result.toxicity_score,
+                        threat_level_value=processing_result.threat_level.value,
                         delivery_time_ms=delivery_time,
                         email_sender_used=self.config.sender_type
                     )
@@ -155,7 +155,7 @@ class IntegratedDeliveryManager(DeliveryManagerInterface):
             success=False,
             attempts=attempts,
             protection_action=processing_result.action,
-            toxicity_score=processing_result.toxicity_score,
+            threat_level_value=processing_result.threat_level.value,
             error_message=last_error,
             email_sender_used=self.config.sender_type
         )

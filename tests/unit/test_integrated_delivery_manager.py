@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional
 from cellophanemail.features.email_protection.ephemeral_email import EphemeralEmail
 from cellophanemail.features.email_protection.in_memory_processor import ProcessingResult, ProtectionAction
 from cellophanemail.features.email_protection.email_composition_strategy import DeliveryConfiguration
+from analysis_engine.types import ThreatLevel
 
 # Try to import integrated delivery components (should fail initially - RED phase)
 try:
@@ -64,7 +65,7 @@ class TestIntegratedDeliveryManager:
         
         processing_result = ProcessingResult(
             action=ProtectionAction.FORWARD_CLEAN,
-            toxicity_score=0.12,
+            threat_level=ThreatLevel.SAFE,
             processed_content="This is a clean test email",
             requires_delivery=True,
             delivery_targets=["user@example.com"],
@@ -86,7 +87,7 @@ class TestIntegratedDeliveryManager:
         assert result.success == True
         assert result.attempts >= 1
         assert result.protection_action == ProtectionAction.FORWARD_CLEAN
-        assert result.toxicity_score == 0.12
+        assert result.threat_level_value == "safe"
         assert result.error_message is None
         assert result.email_sender_used == "postmark"
         assert result.delivery_time_ms is not None
@@ -119,7 +120,7 @@ class TestIntegratedDeliveryManager:
         
         processing_result = ProcessingResult(
             action=ProtectionAction.REDACT_HARMFUL,
-            toxicity_score=0.72,
+            threat_level=ThreatLevel.MEDIUM,
             processed_content="This had [REDACTED] words that got filtered",
             requires_delivery=True,
             delivery_targets=["user@example.com"],
@@ -138,7 +139,7 @@ class TestIntegratedDeliveryManager:
         # Should succeed with redacted content
         assert result.success == True
         assert result.protection_action == ProtectionAction.REDACT_HARMFUL
-        assert result.toxicity_score == 0.72
+        assert result.threat_level_value == "medium"
         assert result.email_sender_used == "postmark"
     
     @pytest.mark.skipif(not INTEGRATED_DELIVERY_AVAILABLE, reason="Integrated delivery modules not available")
@@ -165,7 +166,7 @@ class TestIntegratedDeliveryManager:
         
         processing_result = ProcessingResult(
             action=ProtectionAction.BLOCK_ENTIRELY,
-            toxicity_score=0.95,
+            threat_level=ThreatLevel.CRITICAL,
             processed_content="",  # Empty for blocked content
             requires_delivery=False,  # No delivery needed
             delivery_targets=[],
@@ -211,7 +212,7 @@ class TestIntegratedDeliveryManager:
         
         processing_result = ProcessingResult(
             action=ProtectionAction.FORWARD_CLEAN,
-            toxicity_score=0.15,
+            threat_level=ThreatLevel.SAFE,
             processed_content="This email will fail initially",
             requires_delivery=True,
             delivery_targets=["user@example.com"],
@@ -257,7 +258,7 @@ class TestIntegratedDeliveryManager:
         
         processing_result = ProcessingResult(
             action=ProtectionAction.FORWARD_CLEAN,
-            toxicity_score=0.20,
+            threat_level=ThreatLevel.LOW,
             processed_content="This email will always fail",
             requires_delivery=True,
             delivery_targets=["user@example.com"],
@@ -309,7 +310,7 @@ class TestIntegratedDeliveryManager:
         
         processing_result = ProcessingResult(
             action=ProtectionAction.FORWARD_CLEAN,
-            toxicity_score=0.08,
+            threat_level=ThreatLevel.SAFE,
             processed_content="Testing SMTP delivery",
             requires_delivery=True,
             delivery_targets=["user@example.com"],
@@ -360,7 +361,7 @@ class TestIntegratedDeliveryManager:
         
         processing_result = ProcessingResult(
             action=ProtectionAction.REDACT_HARMFUL,
-            toxicity_score=0.55,
+            threat_level=ThreatLevel.MEDIUM,
             processed_content="This is part of a [REDACTED] thread",
             requires_delivery=True,
             delivery_targets=["user@example.com"],
@@ -395,7 +396,7 @@ class TestIntegratedDeliveryManager:
             
             # Should have transparency headers
             assert sent_headers["X-Protection-Action"] == "redact_harmful"
-            assert sent_headers["X-Toxicity-Score"] == "0.55"
+            assert sent_headers["X-Threat-Level"] == "medium"
             assert sent_headers["X-Original-From"] == "threaded@example.com"
     
     @pytest.mark.skipif(not INTEGRATED_DELIVERY_AVAILABLE, reason="Integrated delivery modules not available")
@@ -407,16 +408,16 @@ class TestIntegratedDeliveryManager:
             success=True,
             attempts=2,
             protection_action=ProtectionAction.FORWARD_CLEAN,
-            toxicity_score=0.25,
+            threat_level_value="low",
             error_message=None,
             delivery_time_ms=150,
             email_sender_used="postmark"
         )
-        
+
         assert result.success == True
         assert result.attempts == 2
         assert result.protection_action == ProtectionAction.FORWARD_CLEAN
-        assert result.toxicity_score == 0.25
+        assert result.threat_level_value == "low"
         assert result.error_message is None
         assert result.delivery_time_ms == 150
         assert result.email_sender_used == "postmark"

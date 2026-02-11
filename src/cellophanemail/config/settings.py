@@ -164,12 +164,15 @@ class Settings(BaseSettings):
     @field_validator('database_url')
     @classmethod
     def validate_database_url(cls, v: str) -> str:
-        """Validate database URL is provided."""
+        """Validate database URL is provided and secure."""
         # Skip validation in test mode (unless STRICT_VALIDATION=true)
         if _skip_validation():
             return v
         if not v or len(v.strip()) == 0:
             raise ValueError("DATABASE_URL is required and cannot be empty")
+        # Check for default/insecure passwords
+        if "postgres:password@" in v.lower():
+            raise ValueError("DATABASE_URL contains default 'password' - use a secure password")
         return v
 
     @field_validator('anthropic_api_key')

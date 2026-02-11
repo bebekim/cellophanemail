@@ -78,61 +78,53 @@ class TestPrivacyIntegration:
                             
                             print("✅ Complete privacy flow works - Email processed in-memory only")
     
-    @pytest.mark.asyncio  
-    async def test_webhook_to_forward_flow_with_normal_mode(self):
-        """Test complete flow: webhook → normal analysis → forward WITH database logging"""
-        
-        # Ensure normal mode (privacy disabled)
+    @pytest.mark.asyncio
+    async def test_webhook_flow_always_uses_privacy_pipeline(self):
+        """Test: Even with PRIVACY_MODE=false, system uses privacy-only pipeline (no normal mode)"""
+
+        # Even with privacy disabled, system is privacy-only
         with patch.dict(os.environ, {'PRIVACY_MODE': 'false'}, clear=True):
-            
+
             webhook_payload = {
                 "MessageID": "normal-flow-test-001",
                 "From": "friend@example.com",
                 "To": "shield.xyz789@cellophanemail.com",
                 "Subject": "Hello Normal Mode!",
-                "Date": "2025-01-08T10:00:00Z", 
-                "TextBody": "This should use normal processing"
+                "Date": "2025-01-08T10:00:00Z",
+                "TextBody": "This should use privacy processing"
             }
-            
+
             app = Litestar(
                 route_handlers=[WebhookController],
                 debug=True
             )
-            
+
             with patch('cellophanemail.features.shield_addresses.ShieldAddressManager.lookup_user_by_shield_address') as mock_shield:
                 mock_shield_info = Mock()
                 mock_shield_info.user_id = 'normal-user-456'
                 mock_shield_info.user_email = 'normaluser@example.com'
                 mock_shield_info.organization_id = '456'
                 mock_shield.return_value = mock_shield_info
-                
-                # Mock the normal email protection processor
-                with patch('cellophanemail.features.email_protection.EmailProtectionProcessor.process_email') as mock_processor:
-                    mock_result = Mock()
-                    mock_result.should_forward = True
-                    mock_result.analysis.toxicity_score = 0.1
-                    mock_result.analysis.processing_time_ms = 1000
-                    mock_result.block_reason = None
-                    mock_result.analysis.horsemen_detected = []
-                    mock_processor.return_value = mock_result
-                    
-                    # Mock Postmark email sending 
-                    with patch('cellophanemail.providers.postmark.provider.PostmarkProvider.send_message') as mock_send:
-                        mock_send.return_value = True
-                        
-                        async with AsyncTestClient(app=app) as client:
-                            response = await client.post("/webhooks/postmark", json=webhook_payload)
-                            
-                            # Assert - Normal mode behavior
-                            # 1. Should return 200 OK (normal mode)
-                            assert response.status_code == 200
-                            
-                            # 2. Normal processor should be called
-                            mock_processor.assert_called_once()
-                            
-                            # 3. Response should indicate forwarding
-                            response_data = response.json()
-                            assert response_data.get("status") == "accepted"
-                            assert response_data.get("processing") == "forwarded"
-                            
-                            print("✅ Complete normal flow works - Email processed with database logging")
+
+                # Mock the privacy orchestrator (system is privacy-only now)
+                with patch('cellophanemail.features.privacy_integration.privacy_webhook_orchestrator.PrivacyWebhookOrchestrator.process_webhook') as mock_privacy:
+                    mock_privacy.return_value = {
+                        "status": "accepted",
+                        "message_id": "normal-flow-test-001",
+                        "processing": "async_privacy_pipeline"
+                    }
+
+                    async with AsyncTestClient(app=app) as client:
+                        response = await client.post("/webhooks/postmark", json=webhook_payload)
+
+                        # Assert - Privacy-only pipeline behavior
+                        # 1. Should return 202 Accepted (privacy pipeline)
+                        assert response.status_code == 202
+
+                        # 2. Privacy orchestrator should be called
+                        mock_privacy.assert_called_once()
+
+                        # 3. Response should indicate privacy processing
+                        response_data = response.json()
+                        assert response_data.get("status") == "accepted"
+                        assert response_data.get("processing") == "async_privacy_pipeline"

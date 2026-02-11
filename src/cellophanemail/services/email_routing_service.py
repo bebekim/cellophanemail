@@ -83,7 +83,7 @@ class EmailRoutingService:
         # TDD_IMPLEMENT: Case-insensitive domain matching
         """
         try:
-            if not context.shield_address.endswith(f"@{self.valid_domain}"):
+            if not context.shield_address.lower().endswith(f"@{self.valid_domain.lower()}"):
                 logger.warning(f"Invalid domain in shield address: {context.shield_address}")
                 context.error_message = f"Invalid domain. Expected @{self.valid_domain}"
                 context.error_code = "INVALID_DOMAIN"

@@ -123,7 +123,7 @@ class PostmarkWebhookHandler(Controller):
                 "shield_address": email_message.shield_address,
                 "forwarded": protection_result.should_forward,
                 "threat_level": protection_result.analysis.threat_level.value if protection_result.analysis else None,
-                "toxicity_score": protection_result.analysis.toxicity_score if protection_result.analysis else 0.0,
+                "toxicity_score": protection_result.analysis.threat_level.value if protection_result.analysis else "safe",
                 "block_reason": protection_result.block_reason,
                 "processing_time_ms": protection_result.analysis.processing_time_ms if protection_result.analysis else 0
             }

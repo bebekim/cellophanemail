@@ -97,9 +97,9 @@ class EmailCompositionStrategy:
         
         # Use original content with transparency footer
         body = processing_result.processed_content
-        footer = self._build_transparency_footer(processing_result.action, processing_result.toxicity_score)
+        footer = self._build_transparency_footer(processing_result.action, processing_result.threat_level.value)
         full_body = f"{body}\n\n{footer}"
-        
+
         return EmailComposition(
             subject=original_email.subject,
             body=full_body,
@@ -107,14 +107,14 @@ class EmailCompositionStrategy:
             from_address=f"noreply@{config.service_domain}",
             reply_to=original_email.from_address
         )
-    
+
     def _compose_redacted_email(self, processing_result: ProcessingResult, original_email: EphemeralEmail,
                               config: DeliveryConfiguration) -> EmailComposition:
         """Compose redacted email with filtering notice."""
-        
+
         # Use processed (redacted) content with filtering notice
         body = processing_result.processed_content
-        footer = self._build_transparency_footer(processing_result.action, processing_result.toxicity_score)
+        footer = self._build_transparency_footer(processing_result.action, processing_result.threat_level.value)
         full_body = f"{body}\n\n{footer}"
         
         # Add [Filtered] prefix to subject
@@ -134,9 +134,9 @@ class EmailCompositionStrategy:
         
         # Use summary content with summarization notice
         body = processing_result.processed_content
-        footer = self._build_transparency_footer(processing_result.action, processing_result.toxicity_score)
+        footer = self._build_transparency_footer(processing_result.action, processing_result.threat_level.value)
         full_body = f"{body}\n\n{footer}"
-        
+
         # Add [Summary] prefix to subject
         subject = f"[Summary] {original_email.subject}"
         
@@ -153,9 +153,9 @@ class EmailCompositionStrategy:
         """Compose email with warning context."""
         
         # Use original content with warning header
-        warning_header = f"CAUTION: This email may contain suspicious content (toxicity score: {processing_result.toxicity_score:.2f}). Please review carefully before taking any action.\n\n"
+        warning_header = f"CAUTION: This email may contain suspicious content (threat level: {processing_result.threat_level.value}). Please review carefully before taking any action.\n\n"
         body = warning_header + processing_result.processed_content
-        footer = self._build_transparency_footer(processing_result.action, processing_result.toxicity_score)
+        footer = self._build_transparency_footer(processing_result.action, processing_result.threat_level.value)
         full_body = f"{body}\n\n{footer}"
         
         # Add [Caution] prefix to subject
@@ -175,7 +175,7 @@ class EmailCompositionStrategy:
         
         updated_headers = headers.copy()
         updated_headers["X-Protection-Action"] = processing_result.action.value
-        updated_headers["X-Toxicity-Score"] = str(processing_result.toxicity_score)
+        updated_headers["X-Threat-Level"] = processing_result.threat_level.value
         
         return updated_headers
     
@@ -204,14 +204,14 @@ class EmailCompositionStrategy:
         
         return updated_headers
     
-    def _build_transparency_footer(self, protection_action: ProtectionAction, toxicity_score: float) -> str:
+    def _build_transparency_footer(self, protection_action: ProtectionAction, threat_level_value: str) -> str:
         """Create appropriate transparency footer based on action taken."""
-        
+
         action_footers = {
             ProtectionAction.FORWARD_CLEAN: "---\nProtected by CellophoneMail",
-            ProtectionAction.REDACT_HARMFUL: f"---\nContent filtered by CellophoneMail (toxicity: {toxicity_score:.2f})",
+            ProtectionAction.REDACT_HARMFUL: f"---\nContent filtered by CellophoneMail (threat level: {threat_level_value})",
             ProtectionAction.SUMMARIZE_ONLY: "---\nSummarized by CellophoneMail",
-            ProtectionAction.FORWARD_WITH_CONTEXT: f"---\nCaution notice added by CellophoneMail (toxicity: {toxicity_score:.2f})"
+            ProtectionAction.FORWARD_WITH_CONTEXT: f"---\nCaution notice added by CellophoneMail (threat level: {threat_level_value})"
         }
         
         return action_footers.get(protection_action, "---\nProcessed by CellophoneMail")

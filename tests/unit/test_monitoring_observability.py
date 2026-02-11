@@ -325,10 +325,14 @@ class TestMonitoringObservability:
         processing_time = (time.time() - start_time) * 1000
         
         # Record metrics
+        # ProcessingResult uses threat_level (ThreatLevel enum) instead of toxicity_score
+        # Map threat_level to a numeric score for the monitoring system
+        threat_to_score = {"safe": 0.0, "low": 0.2, "medium": 0.5, "high": 0.8, "critical": 1.0}
+        toxicity_score = threat_to_score.get(result.threat_level.value, 0.0)
         obs_manager.record_email_processing_complete(
             message_id=email.message_id,
             processing_time_ms=processing_time,
-            toxicity_score=result.toxicity_score,
+            toxicity_score=toxicity_score,
             action=result.action
         )
         

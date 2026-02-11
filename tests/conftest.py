@@ -3,6 +3,7 @@
 import os
 import sys
 import pytest
+import pytest_asyncio
 from typing import AsyncGenerator
 from pathlib import Path
 from dotenv import load_dotenv
@@ -27,7 +28,7 @@ from litestar.testing import AsyncTestClient
 from cellophanemail.app import create_app
 
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def test_client() -> AsyncGenerator[AsyncTestClient, None]:
     """Create a test client for the application."""
     # Ensure staging flag is set before creating app

@@ -127,7 +127,7 @@ def create_app() -> Litestar:
     # CSRF protection for state-changing operations (important for SaaS)
     # Disable CSRF in testing mode only
     csrf_config = None
-    if not settings.testing:
+    if not settings.staging:
         csrf_config = CSRFConfig(
             secret=settings.secret_key,
             cookie_name="cellophane_csrf",
@@ -189,7 +189,7 @@ def create_app() -> Litestar:
             "settings": Provide(lambda: settings, sync_to_thread=False),
         },
         debug=settings.debug,
-        pdb_on_exception=settings.debug if not settings.testing else False,  # Disable pdb during tests
+        pdb_on_exception=settings.debug if not settings.staging else False,  # Disable pdb during tests
         plugins=[PydanticPlugin()],
     )
     

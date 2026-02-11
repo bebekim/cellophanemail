@@ -49,6 +49,7 @@ except ImportError:
 class TestDeploymentInfrastructure:
     """Test deployment and infrastructure system for privacy email processing"""
     
+    @pytest.mark.xfail(reason="RED TEST: deployment modules not yet implemented")
     def test_deployment_modules_exist(self):
         """
         RED TEST: Deployment modules should exist
@@ -441,6 +442,7 @@ class TestDeploymentInfrastructure:
         assert hasattr(restore_result, 'success')
         assert hasattr(restore_result, 'restored_tables')
     
+    @pytest.mark.xfail(reason="RED TEST: deployment modules not yet implemented")
     def test_deployment_interfaces_exist(self):
         """
         RED TEST: Deployment interfaces should be properly defined

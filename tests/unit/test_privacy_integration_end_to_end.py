@@ -69,56 +69,52 @@ class TestPrivacyIntegrationEndToEnd:
                         assert "privacy" in str(response_data).lower() or "accepted" in str(response_data).lower()
     
     @pytest.mark.asyncio
-    async def test_normal_mode_allows_database_logging_in_webhook_flow(self):
+    async def test_privacy_mode_false_still_uses_privacy_pipeline(self):
         """
-        RED TEST: When PRIVACY_MODE=false, webhook flow should log to database (current behavior)
-        This verifies backward compatibility
+        Test: Even with PRIVACY_MODE=false, the system now uses the privacy-only pipeline.
+        ProcessingStrategyManager is privacy-only (no normal/legacy mode).
         """
-        # Arrange - Ensure privacy mode is disabled
+        # Arrange - Privacy mode false, but pipeline is still privacy-only
         with patch.dict(os.environ, {'PRIVACY_MODE': 'false'}, clear=True):
-            
+
             payload = {
-                "MessageID": "normal-test-001", 
+                "MessageID": "normal-test-001",
                 "From": "sender@example.com",
                 "To": "shield.test456@cellophanemail.com",
                 "Subject": "Normal Mode Email",
                 "Date": "2025-01-08T10:00:00Z",
-                "TextBody": "This should use normal processing"
+                "TextBody": "This should use privacy processing"
             }
-            
+
             app = Litestar(
                 route_handlers=[WebhookController],
                 debug=True
             )
-            
+
             with patch('cellophanemail.features.shield_addresses.ShieldAddressManager.lookup_user_by_shield_address') as mock_shield:
-                # Return proper mock object with attributes
                 mock_shield_info = Mock()
-                mock_shield_info.user_id = 'user-456'  
+                mock_shield_info.user_id = 'user-456'
                 mock_shield_info.user_email = 'user@example.com'
                 mock_shield_info.organization_id = '123'
                 mock_shield.return_value = mock_shield_info
-                
-                with patch('cellophanemail.features.email_protection.EmailProtectionProcessor.process_email') as mock_protection:
-                    # Mock normal processing response
-                    mock_result = Mock()
-                    mock_result.should_forward = True
-                    mock_result.analysis.toxicity_score = 0.1
-                    mock_result.analysis.processing_time_ms = 1000
-                    mock_result.block_reason = None
-                    mock_result.analysis.horsemen_detected = []
-                    mock_protection.return_value = mock_result
-                    
+
+                with patch('cellophanemail.features.privacy_integration.privacy_webhook_orchestrator.PrivacyWebhookOrchestrator.process_webhook') as mock_privacy:
+                    mock_privacy.return_value = {
+                        "status": "accepted",
+                        "message_id": "normal-test-001",
+                        "processing": "async_privacy_pipeline"
+                    }
+
                     async with AsyncTestClient(app=app) as client:
                         response = await client.post("/webhooks/postmark", json=payload)
-                        
+
                         # Assert
-                        # 1. Should return 200 OK (normal processing)
-                        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
-                        
-                        # 2. Normal processing should be called
-                        mock_protection.assert_called_once()
-                        
-                        # 3. Response should indicate normal processing
+                        # 1. Should return 202 Accepted (privacy-only pipeline)
+                        assert response.status_code == 202, f"Expected 202, got {response.status_code}: {response.text}"
+
+                        # 2. Privacy orchestrator should be called
+                        mock_privacy.assert_called_once()
+
+                        # 3. Response should indicate privacy processing
                         response_data = response.json()
-                        assert response_data.get("status") == "forwarded" or "message_id" in response_data
+                        assert response_data.get("status") == "accepted"

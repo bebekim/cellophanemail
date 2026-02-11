@@ -18,6 +18,12 @@ from tests.factories import UserFactory, JWTFactory
 from tests.assertions import assert_valid_jwt_structure, assert_jwt_contains_claims
 
 
+def _create_middleware():
+    """Create a JWTAuthenticationMiddleware with a mock app."""
+    mock_app = MagicMock()
+    return JWTAuthenticationMiddleware(app=mock_app)
+
+
 class TestJWTUser:
     """Test JWTUser class."""
 
@@ -39,6 +45,7 @@ class TestJWTUser:
             sub="user-456",
             email="payload@example.com",
             role="admin",
+            type="access",
             exp=1234567890,
             iat=1234567800,
             jti="jti-123"
@@ -69,7 +76,7 @@ class TestJWTAuthenticationMiddleware:
         )
 
         # Authenticate
-        middleware = JWTAuthenticationMiddleware()
+        middleware = _create_middleware()
         result = await middleware.authenticate_request(connection)
 
         # Verify user was authenticated
@@ -94,7 +101,7 @@ class TestJWTAuthenticationMiddleware:
         )
 
         # Authenticate
-        middleware = JWTAuthenticationMiddleware()
+        middleware = _create_middleware()
         result = await middleware.authenticate_request(connection)
 
         # Verify user was authenticated
@@ -122,7 +129,7 @@ class TestJWTAuthenticationMiddleware:
         )
 
         # Authenticate
-        middleware = JWTAuthenticationMiddleware()
+        middleware = _create_middleware()
         result = await middleware.authenticate_request(connection)
 
         # Should use header token (priority)
@@ -136,7 +143,7 @@ class TestJWTAuthenticationMiddleware:
         connection = create_mock_asgi_connection()
 
         # Authenticate
-        middleware = JWTAuthenticationMiddleware()
+        middleware = _create_middleware()
         result = await middleware.authenticate_request(connection)
 
         # Should return empty auth result (allows anonymous requests)
@@ -152,7 +159,7 @@ class TestJWTAuthenticationMiddleware:
         )
 
         # Authenticate
-        middleware = JWTAuthenticationMiddleware()
+        middleware = _create_middleware()
         result = await middleware.authenticate_request(connection)
 
         # Should return empty auth result (invalid token treated as anonymous)
@@ -175,7 +182,7 @@ class TestJWTAuthenticationMiddleware:
         with patch('cellophanemail.middleware.jwt_auth.verify_token') as mock_verify:
             mock_verify.side_effect = JWTError("Token expired")
 
-            middleware = JWTAuthenticationMiddleware()
+            middleware = _create_middleware()
             result = await middleware.authenticate_request(connection)
 
         # Should return empty auth result
@@ -293,7 +300,7 @@ class TestCreateAuthResponse:
         response = Response(content={}, status_code=200)
 
         # Mock settings to control secure cookie behavior
-        with patch('cellophanemail.middleware.jwt_auth.get_settings') as mock_settings:
+        with patch('cellophanemail.config.settings.get_settings') as mock_settings:
             mock_settings.return_value.debug = False  # Production mode
 
             result = await create_dual_auth_response(user, response, include_refresh=True)

@@ -31,7 +31,7 @@ def mock_settings():
     mock_settings_obj.jwt_secret = "test_secret_key_minimum_32_chars_long"
     mock_settings_obj.anthropic_api_key = "sk-test-fake-key"
     mock_settings_obj.postmark_api_key = "test-postmark-key"
-    mock_settings_obj.testing = True
+    mock_settings_obj.staging = True
     mock_settings_obj.debug = False
 
     # Patch get_settings to return our mock
