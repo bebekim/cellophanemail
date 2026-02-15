@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from litestar import Litestar
 from litestar.testing import AsyncTestClient
 
-from cellophanemail.routes.auth import AuthController
+from cellophanemail.routes.auth import AuthController, UserRegistration, UserLogin
 from cellophanemail.models.user import User
 from tests.factories import UserFactory, JWTFactory
 
@@ -27,30 +27,42 @@ class TestAuthRegistration:
             "email": "newuser@example.com",
             "password": "SecurePass123",
             "first_name": "Test",
-            "last_name": "User"
+            "last_name": "User",
         }
 
         # Mock auth service functions
-        with patch('cellophanemail.routes.auth.validate_email_unique', new_callable=AsyncMock, return_value=True):
+        with patch(
+            "cellophanemail.routes.auth.validate_email_unique",
+            new_callable=AsyncMock,
+            return_value=True,
+        ):
             mock_user = UserFactory.create_user(
-                user_id="new-user-123",
-                email=registration_data["email"]
+                user_id="new-user-123", email=registration_data["email"]
             )
 
-            with patch('cellophanemail.routes.auth.create_user', new_callable=AsyncMock, return_value=mock_user):
+            with patch(
+                "cellophanemail.routes.auth.create_user",
+                new_callable=AsyncMock,
+                return_value=mock_user,
+            ):
                 # Mock Stripe customer creation
                 mock_stripe_customer = MagicMock()
                 mock_stripe_customer.id = "cus_stripe123"
 
-                with patch('cellophanemail.routes.auth.StripeService') as MockStripe:
+                with patch("cellophanemail.routes.auth.StripeService") as MockStripe:
                     mock_stripe_instance = MockStripe.return_value
-                    mock_stripe_instance.create_customer = AsyncMock(return_value=mock_stripe_customer)
+                    mock_stripe_instance.create_customer = AsyncMock(
+                        return_value=mock_stripe_customer
+                    )
 
                     # Mock user.save()
                     mock_user.save = AsyncMock()
 
                     # Mock create_auth_response to return tokens
-                    with patch('cellophanemail.routes.auth.create_auth_response', new_callable=AsyncMock) as mock_auth_response:
+                    with patch(
+                        "cellophanemail.routes.auth.create_auth_response",
+                        new_callable=AsyncMock,
+                    ) as mock_auth_response:
                         mock_auth_response.return_value = {
                             "access_token": "mock_access_token",
                             "refresh_token": "mock_refresh_token",
@@ -61,12 +73,14 @@ class TestAuthRegistration:
                                 "email": registration_data["email"],
                                 "username": "newuser",
                                 "role": "user",
-                                "is_verified": False
-                            }
+                                "is_verified": False,
+                            },
                         }
 
                         async with AsyncTestClient(app=auth_app) as client:
-                            response = await client.post("/api/v1/auth/register", json=registration_data)
+                            response = await client.post(
+                                "/api/v1/auth/register", json=registration_data
+                            )
 
                             assert response.status_code == 201
                             data = response.json()
@@ -77,16 +91,84 @@ class TestAuthRegistration:
                             assert data["message"] is not None
 
     @pytest.mark.asyncio
+    async def test_register_with_phone_number(self, auth_app):
+        """Test successful registration with phone number instead of email."""
+        registration_data = {
+            "phone_number": "+61412345678",
+            "password": "SecurePass123",
+        }
+
+        with patch(
+            "cellophanemail.routes.auth.validate_phone_unique",
+            new_callable=AsyncMock,
+            return_value=True,
+        ):
+            mock_user = UserFactory.create_user(
+                user_id="phone-user-123",
+                email=None,
+                phone_number="+61412345678",
+            )
+
+            with patch(
+                "cellophanemail.routes.auth.create_user",
+                new_callable=AsyncMock,
+                return_value=mock_user,
+            ):
+                mock_stripe_customer = MagicMock()
+                mock_stripe_customer.id = "cus_stripe_phone"
+
+                with patch("cellophanemail.routes.auth.StripeService") as MockStripe:
+                    mock_stripe_instance = MockStripe.return_value
+                    mock_stripe_instance.create_customer = AsyncMock(
+                        return_value=mock_stripe_customer
+                    )
+                    mock_user.save = AsyncMock()
+
+                    with patch(
+                        "cellophanemail.routes.auth.create_auth_response",
+                        new_callable=AsyncMock,
+                    ) as mock_auth_response:
+                        mock_auth_response.return_value = {
+                            "access_token": "mock_access_token",
+                            "refresh_token": "mock_refresh_token",
+                            "token_type": "Bearer",
+                            "expires_in": 900,
+                            "user": {
+                                "id": "phone-user-123",
+                                "email": None,
+                                "phone_number": "+61412345678",
+                                "username": "user5678123",
+                                "role": "user",
+                                "is_verified": False,
+                            },
+                        }
+
+                        async with AsyncTestClient(app=auth_app) as client:
+                            response = await client.post(
+                                "/api/v1/auth/register", json=registration_data
+                            )
+
+                            assert response.status_code == 201
+                            data = response.json()
+                            assert "access_token" in data
+
+    @pytest.mark.asyncio
     async def test_register_duplicate_email(self, auth_app):
         """Test registration fails with duplicate email."""
         registration_data = {
             "email": "existing@example.com",
-            "password": "SecurePass123"
+            "password": "SecurePass123",
         }
 
-        with patch('cellophanemail.routes.auth.validate_email_unique', new_callable=AsyncMock, return_value=False):
+        with patch(
+            "cellophanemail.routes.auth.validate_email_unique",
+            new_callable=AsyncMock,
+            return_value=False,
+        ):
             async with AsyncTestClient(app=auth_app) as client:
-                response = await client.post("/api/v1/auth/register", json=registration_data)
+                response = await client.post(
+                    "/api/v1/auth/register", json=registration_data
+                )
 
                 assert response.status_code == 400
                 data = response.json()
@@ -95,15 +177,28 @@ class TestAuthRegistration:
                 assert data["field"] == "email"
 
     @pytest.mark.asyncio
+    async def test_register_no_identifier(self, auth_app):
+        """Test registration fails when neither email nor phone provided."""
+        registration_data = {"password": "SecurePass123"}
+
+        async with AsyncTestClient(app=auth_app) as client:
+            response = await client.post(
+                "/api/v1/auth/register", json=registration_data
+            )
+            assert response.status_code == 400
+
+    @pytest.mark.asyncio
     async def test_register_weak_password(self, auth_app):
         """Test registration fails with weak password."""
         registration_data = {
             "email": "test@example.com",
-            "password": "weak"  # Too short, no uppercase, no digits
+            "password": "weak",  # Too short, no uppercase, no digits
         }
 
         async with AsyncTestClient(app=auth_app) as client:
-            response = await client.post("/api/v1/auth/register", json=registration_data)
+            response = await client.post(
+                "/api/v1/auth/register", json=registration_data
+            )
 
             assert response.status_code == 400
             # Pydantic validation should catch this
@@ -111,13 +206,12 @@ class TestAuthRegistration:
     @pytest.mark.asyncio
     async def test_register_invalid_email_format(self, auth_app):
         """Test registration fails with invalid email format."""
-        registration_data = {
-            "email": "not-an-email",
-            "password": "SecurePass123"
-        }
+        registration_data = {"email": "not-an-email", "password": "SecurePass123"}
 
         async with AsyncTestClient(app=auth_app) as client:
-            response = await client.post("/api/v1/auth/register", json=registration_data)
+            response = await client.post(
+                "/api/v1/auth/register", json=registration_data
+            )
 
             assert response.status_code == 400
 
@@ -127,53 +221,124 @@ class TestAuthLogin:
 
     @pytest.mark.asyncio
     async def test_login_success(self, auth_app):
-        """Test successful user login."""
-        login_data = {
-            "email": "user@example.com",
-            "password": "SecurePass123"
-        }
+        """Test successful user login with identifier."""
+        login_data = {"identifier": "user@example.com", "password": "SecurePass123"}
 
         mock_user = UserFactory.create_user(
-            user_id="user-123",
-            email=login_data["email"]
+            user_id="user-123", email="user@example.com"
         )
 
-        with patch.object(User, 'objects') as mock_objects:
-            mock_where = AsyncMock()
-            mock_where.first = AsyncMock(return_value=mock_user)
-            mock_objects.return_value.where.return_value = mock_where
+        with patch(
+            "cellophanemail.routes.auth.find_user_by_identifier",
+            new_callable=AsyncMock,
+            return_value=mock_user,
+        ):
+            with patch("cellophanemail.routes.auth.verify_password", return_value=True):
+                with patch(
+                    "cellophanemail.middleware.jwt_auth.create_dual_auth_response",
+                    new_callable=AsyncMock,
+                ) as mock_dual_auth:
 
-            with patch('cellophanemail.routes.auth.verify_password', return_value=True):
-                with patch('cellophanemail.middleware.jwt_auth.create_dual_auth_response', new_callable=AsyncMock) as mock_dual_auth:
-                    # Mock dual auth response to return Response with tokens
                     async def create_response_with_tokens(user, response):
                         response.content = {
                             "access_token": "mock_access_token",
                             "refresh_token": "mock_refresh_token",
-                            "token_type": "Bearer"
+                            "token_type": "Bearer",
                         }
                         return response
 
                     mock_dual_auth.side_effect = create_response_with_tokens
 
                     async with AsyncTestClient(app=auth_app) as client:
-                        response = await client.post("/api/v1/auth/login", json=login_data)
+                        response = await client.post(
+                            "/api/v1/auth/login", json=login_data
+                        )
 
+                        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_login_with_legacy_email_field(self, auth_app):
+        """Test login with legacy {"email": ...} payload still works."""
+        login_data = {"email": "user@example.com", "password": "SecurePass123"}
+
+        mock_user = UserFactory.create_user(
+            user_id="user-123", email="user@example.com"
+        )
+
+        with patch(
+            "cellophanemail.routes.auth.find_user_by_identifier",
+            new_callable=AsyncMock,
+            return_value=mock_user,
+        ):
+            with patch("cellophanemail.routes.auth.verify_password", return_value=True):
+                with patch(
+                    "cellophanemail.middleware.jwt_auth.create_dual_auth_response",
+                    new_callable=AsyncMock,
+                ) as mock_dual_auth:
+
+                    async def create_response_with_tokens(user, response):
+                        response.content = {
+                            "access_token": "mock_access_token",
+                            "refresh_token": "mock_refresh_token",
+                            "token_type": "Bearer",
+                        }
+                        return response
+
+                    mock_dual_auth.side_effect = create_response_with_tokens
+
+                    async with AsyncTestClient(app=auth_app) as client:
+                        response = await client.post(
+                            "/api/v1/auth/login", json=login_data
+                        )
+                        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_login_with_phone(self, auth_app):
+        """Test login with phone number."""
+        login_data = {"identifier": "+61412345678", "password": "SecurePass123"}
+
+        mock_user = UserFactory.create_user(
+            user_id="user-phone",
+            email=None,
+            phone_number="+61412345678",
+        )
+
+        with patch(
+            "cellophanemail.routes.auth.find_user_by_identifier",
+            new_callable=AsyncMock,
+            return_value=mock_user,
+        ):
+            with patch("cellophanemail.routes.auth.verify_password", return_value=True):
+                with patch(
+                    "cellophanemail.middleware.jwt_auth.create_dual_auth_response",
+                    new_callable=AsyncMock,
+                ) as mock_dual_auth:
+
+                    async def create_response_with_tokens(user, response):
+                        response.content = {
+                            "access_token": "mock_access_token",
+                            "token_type": "Bearer",
+                        }
+                        return response
+
+                    mock_dual_auth.side_effect = create_response_with_tokens
+
+                    async with AsyncTestClient(app=auth_app) as client:
+                        response = await client.post(
+                            "/api/v1/auth/login", json=login_data
+                        )
                         assert response.status_code == 200
 
     @pytest.mark.asyncio
     async def test_login_user_not_found(self, auth_app):
         """Test login fails with non-existent user."""
-        login_data = {
-            "email": "notfound@example.com",
-            "password": "SecurePass123"
-        }
+        login_data = {"identifier": "notfound@example.com", "password": "SecurePass123"}
 
-        with patch.object(User, 'objects') as mock_objects:
-            mock_where = AsyncMock()
-            mock_where.first = AsyncMock(return_value=None)
-            mock_objects.return_value.where.return_value = mock_where
-
+        with patch(
+            "cellophanemail.routes.auth.find_user_by_identifier",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
             async with AsyncTestClient(app=auth_app) as client:
                 response = await client.post("/api/v1/auth/login", json=login_data)
 
@@ -185,22 +350,20 @@ class TestAuthLogin:
     @pytest.mark.asyncio
     async def test_login_wrong_password(self, auth_app):
         """Test login fails with incorrect password."""
-        login_data = {
-            "email": "user@example.com",
-            "password": "WrongPass123"
-        }
+        login_data = {"identifier": "user@example.com", "password": "WrongPass123"}
 
         mock_user = UserFactory.create_user(
-            user_id="user-123",
-            email=login_data["email"]
+            user_id="user-123", email="user@example.com"
         )
 
-        with patch.object(User, 'objects') as mock_objects:
-            mock_where = AsyncMock()
-            mock_where.first = AsyncMock(return_value=mock_user)
-            mock_objects.return_value.where.return_value = mock_where
-
-            with patch('cellophanemail.routes.auth.verify_password', return_value=False):
+        with patch(
+            "cellophanemail.routes.auth.find_user_by_identifier",
+            new_callable=AsyncMock,
+            return_value=mock_user,
+        ):
+            with patch(
+                "cellophanemail.routes.auth.verify_password", return_value=False
+            ):
                 async with AsyncTestClient(app=auth_app) as client:
                     response = await client.post("/api/v1/auth/login", json=login_data)
 
@@ -216,25 +379,22 @@ class TestAuthProfile:
     async def test_get_profile_authenticated(self, auth_app):
         """Test getting profile with valid JWT."""
         mock_user = UserFactory.create_user(
-            user_id="user-123",
-            email="user@example.com"
+            user_id="user-123", email="user@example.com"
         )
 
         # Create real JWT token
         token = JWTFactory.create_access_token(
-            user_id=str(mock_user.id),
-            email=mock_user.email
+            user_id=str(mock_user.id), email=mock_user.email
         )
 
-        with patch.object(User, 'objects') as mock_objects:
+        with patch.object(User, "objects") as mock_objects:
             mock_where = AsyncMock()
             mock_where.first = AsyncMock(return_value=mock_user)
             mock_objects.return_value.where.return_value = mock_where
 
             async with AsyncTestClient(app=auth_app) as client:
-                response = await client.get(
-                    "/api/v1/auth/profile",
-                    headers={"Authorization": f"Bearer {token}"}
+                await client.get(
+                    "/api/v1/auth/profile", headers={"Authorization": f"Bearer {token}"}
                 )
 
                 # Note: Without JWT middleware integrated in test app, this will likely fail
@@ -261,18 +421,19 @@ class TestAuthLogout:
     async def test_logout_with_token(self, auth_app):
         """Test logout blacklists token and clears cookies."""
         token = JWTFactory.create_access_token(
-            user_id="user-123",
-            email="user@example.com"
+            user_id="user-123", email="user@example.com"
         )
 
-        with patch('cellophanemail.services.jwt_service.decode_token') as mock_decode:
+        with patch("cellophanemail.services.jwt_service.decode_token") as mock_decode:
             mock_decode.return_value = {"jti": "token-jti-123"}
 
-            with patch('cellophanemail.services.jwt_service.blacklist_token') as mock_blacklist:
+            with patch(
+                "cellophanemail.services.jwt_service.blacklist_token"
+            ) as mock_blacklist:
                 async with AsyncTestClient(app=auth_app) as client:
                     response = await client.post(
                         "/api/v1/auth/logout",
-                        headers={"Authorization": f"Bearer {token}"}
+                        headers={"Authorization": f"Bearer {token}"},
                     )
 
                     assert response.status_code == 200
@@ -299,18 +460,18 @@ class TestAuthTokenRefresh:
     @pytest.mark.asyncio
     async def test_refresh_token_success(self, auth_app):
         """Test successful token refresh."""
-        refresh_token = JWTFactory.create_refresh_token(
-            user_id="user-123"
-        )
+        refresh_token = JWTFactory.create_refresh_token(user_id="user-123")
 
-        with patch('cellophanemail.services.jwt_service.refresh_access_token', new_callable=AsyncMock) as mock_refresh:
+        with patch(
+            "cellophanemail.services.jwt_service.refresh_access_token",
+            new_callable=AsyncMock,
+        ) as mock_refresh:
             new_access_token = "new_access_token_123"
             mock_refresh.return_value = new_access_token
 
             async with AsyncTestClient(app=auth_app) as client:
                 response = await client.post(
-                    "/api/v1/auth/refresh",
-                    json={"refresh_token": refresh_token}
+                    "/api/v1/auth/refresh", json={"refresh_token": refresh_token}
                 )
 
                 assert response.status_code == 200
@@ -335,13 +496,15 @@ class TestAuthTokenRefresh:
         """Test refresh fails with invalid refresh token."""
         from cellophanemail.services.jwt_service import JWTError
 
-        with patch('cellophanemail.services.jwt_service.refresh_access_token', new_callable=AsyncMock) as mock_refresh:
+        with patch(
+            "cellophanemail.services.jwt_service.refresh_access_token",
+            new_callable=AsyncMock,
+        ) as mock_refresh:
             mock_refresh.side_effect = JWTError("Invalid token")
 
             async with AsyncTestClient(app=auth_app) as client:
                 response = await client.post(
-                    "/api/v1/auth/refresh",
-                    json={"refresh_token": "invalid_token"}
+                    "/api/v1/auth/refresh", json={"refresh_token": "invalid_token"}
                 )
 
                 assert response.status_code == 400
@@ -355,13 +518,11 @@ class TestAuthPasswordValidation:
 
     def test_password_too_short(self):
         """Test password validation rejects short passwords."""
-        from cellophanemail.routes.auth import UserRegistration
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError) as exc_info:
             UserRegistration(
-                email="test@example.com",
-                password="Short1"  # Only 6 characters
+                email="test@example.com", password="Short1"  # Only 6 characters
             )
 
         errors = exc_info.value.errors()
@@ -369,53 +530,82 @@ class TestAuthPasswordValidation:
 
     def test_password_missing_uppercase(self):
         """Test password validation requires uppercase letter."""
-        from cellophanemail.routes.auth import UserRegistration
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError) as exc_info:
-            UserRegistration(
-                email="test@example.com",
-                password="lowercase123"
-            )
+            UserRegistration(email="test@example.com", password="lowercase123")
 
         errors = exc_info.value.errors()
         assert any("uppercase" in str(error).lower() for error in errors)
 
     def test_password_missing_lowercase(self):
         """Test password validation requires lowercase letter."""
-        from cellophanemail.routes.auth import UserRegistration
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError) as exc_info:
-            UserRegistration(
-                email="test@example.com",
-                password="UPPERCASE123"
-            )
+            UserRegistration(email="test@example.com", password="UPPERCASE123")
 
         errors = exc_info.value.errors()
         assert any("lowercase" in str(error).lower() for error in errors)
 
     def test_password_missing_digit(self):
         """Test password validation requires digit."""
-        from cellophanemail.routes.auth import UserRegistration
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError) as exc_info:
-            UserRegistration(
-                email="test@example.com",
-                password="NoDigitsHere"
-            )
+            UserRegistration(email="test@example.com", password="NoDigitsHere")
 
         errors = exc_info.value.errors()
         assert any("digit" in str(error).lower() for error in errors)
 
     def test_password_valid(self):
         """Test password validation accepts valid password."""
-        from cellophanemail.routes.auth import UserRegistration
 
         registration = UserRegistration(
-            email="test@example.com",
-            password="ValidPass123"
+            email="test@example.com", password="ValidPass123"
         )
 
         assert registration.password == "ValidPass123"
+
+    def test_phone_only_registration_valid(self):
+        """Test registration with phone only (no email) is valid."""
+
+        registration = UserRegistration(
+            phone_number="+61412345678", password="ValidPass123"
+        )
+
+        assert registration.phone_number == "+61412345678"
+        assert registration.email is None
+
+    def test_invalid_phone_format_rejected(self):
+        """Test registration rejects invalid phone format."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError) as exc_info:
+            UserRegistration(
+                phone_number="0412345678", password="ValidPass123"  # Missing + prefix
+            )
+
+        errors = exc_info.value.errors()
+        assert any("E.164" in str(error) for error in errors)
+
+
+class TestUserLoginModel:
+    """Test UserLogin model behavior."""
+
+    def test_identifier_field(self):
+        """Test login with identifier field."""
+        login = UserLogin(identifier="user@example.com", password="pass")
+        assert login.identifier == "user@example.com"
+
+    def test_legacy_email_field_maps_to_identifier(self):
+        """Test legacy email field is mapped to identifier."""
+        login = UserLogin.model_validate(
+            {"email": "user@example.com", "password": "pass"}
+        )
+        assert login.identifier == "user@example.com"
+
+    def test_phone_as_identifier(self):
+        """Test phone number as identifier."""
+        login = UserLogin(identifier="+61412345678", password="pass")
+        assert login.identifier == "+61412345678"

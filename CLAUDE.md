@@ -53,12 +53,16 @@ uv run mypy src/cellophanemail --ignore-missing-imports
 
 ## Migrations (Piccolo ORM)
 
+Local dev uses a shared `postgres_dev` Docker container (`postgres:16-alpine` on port 5432). The `cellophanemail` database and password were set up manually — **not** via docker-compose. Credentials match the `piccolo_conf.py` fallback: `postgres:password@localhost:5432/cellophanemail`.
+
 ```bash
-# Create migration
-uv run piccolo migrations create cellophanemail --auto
+# Create migration (needs PYTHONPATH for module resolution)
+PYTHONPATH=src DATABASE_URL="postgresql://postgres:password@localhost:5432/cellophanemail" \
+  uv run piccolo migrations create cellophanemail --auto
 
 # Run migrations
-uv run piccolo migrations forwards all
+PYTHONPATH=src DATABASE_URL="postgresql://postgres:password@localhost:5432/cellophanemail" \
+  uv run piccolo migrations forwards all
 
 # Via Docker
 docker-compose run migrate uv run piccolo migrations forwards all

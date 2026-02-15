@@ -15,12 +15,15 @@ class UserFactory:
         username: str = "test123",
         is_verified: bool = True,
         stripe_customer_id: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> MagicMock:
         """Create a mock User object with sensible defaults."""
         user = MagicMock()
         user.id = user_id
         user.email = email
+        user.phone_number = kwargs.get("phone_number")
+        user.phone_verified = kwargs.get("phone_verified", False)
+        user.verification_method = kwargs.get("verification_method", "email")
         user.username = username
         user.is_verified = is_verified
         user.stripe_customer_id = stripe_customer_id or "cus_default"
@@ -41,7 +44,7 @@ class UserFactory:
         user_id: str = "user-123",
         email: str = "test@example.com",
         username: str = "test123",
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """Create a user dictionary (for service return values)."""
         return {
@@ -63,7 +66,7 @@ class StripeFactory:
         customer_id: str = "cus_123",
         email: str = "test@example.com",
         name: str = "Test User",
-        **kwargs
+        **kwargs,
     ) -> MagicMock:
         """Create a mock Stripe Customer object."""
         customer = MagicMock()
@@ -77,7 +80,7 @@ class StripeFactory:
     def create_checkout_session(
         session_id: str = "cs_test_123",
         url: str = "https://checkout.stripe.com/test",
-        **kwargs
+        **kwargs,
     ) -> MagicMock:
         """Create a mock Stripe Checkout Session."""
         session = MagicMock()
@@ -91,7 +94,7 @@ class StripeFactory:
     def create_portal_session(
         session_id: str = "bps_test_123",
         url: str = "https://billing.stripe.com/test",
-        **kwargs
+        **kwargs,
     ) -> MagicMock:
         """Create a mock Stripe Portal Session."""
         session = MagicMock()
@@ -105,18 +108,18 @@ class JWTFactory:
 
     @staticmethod
     def create_access_token(
-        user_id: str = "user-123",
-        email: str = "test@example.com",
-        role: str = "user"
+        user_id: str = "user-123", email: str = "test@example.com", role: str = "user"
     ) -> str:
         """Create a REAL JWT access token using the actual service."""
         from cellophanemail.services.jwt_service import create_access_token
+
         return create_access_token(user_id=user_id, email=email, role=role)
 
     @staticmethod
     def create_refresh_token(user_id: str = "user-123") -> str:
         """Create a REAL JWT refresh token using the actual service."""
         from cellophanemail.services.jwt_service import create_refresh_token
+
         return create_refresh_token(user_id=user_id)
 
 
@@ -129,7 +132,7 @@ class EmailRoutingFactory:
         user_id: Optional[str] = None,
         user_email: Optional[str] = None,
         is_active_user: bool = False,
-        **kwargs
+        **kwargs,
     ):
         """Create an EmailRoutingContext for testing."""
         from cellophanemail.services.email_routing_service import EmailRoutingContext
@@ -142,5 +145,5 @@ class EmailRoutingFactory:
             is_valid_domain=kwargs.get("is_valid_domain", False),
             is_active_user=is_active_user,
             error_message=kwargs.get("error_message"),
-            error_code=kwargs.get("error_code")
+            error_code=kwargs.get("error_code"),
         )
