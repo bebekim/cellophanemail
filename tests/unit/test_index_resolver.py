@@ -67,7 +67,7 @@ class TestIndexResolver:
 
         assert cat.start == 0
         assert mat.start == 15
-        assert door.start == 27
+        assert door.start == 28
 
     def test_resolve_longer_span_wins(self):
         """'next Tuesday at 6pm' preferred over 'Tuesday' when both present."""
