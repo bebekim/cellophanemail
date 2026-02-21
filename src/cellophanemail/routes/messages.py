@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from cellophanemail.middleware.jwt_auth import jwt_auth_required
 from cellophanemail.features.email_protection.analyzer_factory import AnalyzerFactory
+from cellophanemail.features.entity_extraction.extractor_factory import ExtractorFactory
 
 
 class MessageChannel(str, Enum):
@@ -201,6 +202,46 @@ class MessageAnalyzeResponse(BaseModel):
 
 
 # ============================================================================
+# Entity Extraction DTOs
+# ============================================================================
+
+
+class EntityExtractRequest(BaseModel):
+    """Request for entity extraction."""
+
+    content: str = Field(
+        ...,
+        min_length=1,
+        max_length=50000,
+        description="Message content to extract entities from",
+    )
+    channel: MessageChannel = Field(
+        default=MessageChannel.OTHER,
+        description="Communication channel (sms, email, chat, other)",
+    )
+
+
+class ExtractedEntityDTO(BaseModel):
+    """Single extracted entity in API response."""
+
+    text: str = Field(..., description="Entity text as it appears in content")
+    type: str = Field(..., description="Entity type: person_name, location, url, email, etc.")
+    start: int = Field(..., ge=0, description="Start character index")
+    end: int = Field(..., ge=0, description="End character index (exclusive)")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Extraction confidence")
+
+
+class EntityExtractResponse(BaseModel):
+    """Entity extraction response."""
+
+    entities: List[ExtractedEntityDTO] = Field(default_factory=list)
+    tone: Optional[str] = Field(None, description="Detected tone: warm, formal, casual, etc.")
+    processing_time_ms: int = Field(..., description="Processing time in milliseconds")
+    extractor_used: str = Field(..., description="Which extractor was used")
+    channel: str = Field(..., description="Channel that was analyzed")
+
+
+# ============================================================================
 # Controller
 # ============================================================================
 
@@ -276,5 +317,38 @@ class MessagesController(Controller):
             # Metadata
             processing_time_ms=analysis.processing_time_ms,
             model_used=model_name,
+            channel=data.channel.value,
+        )
+
+    @post("/extract-entities", status_code=HTTP_200_OK)
+    async def extract_entities(
+        self, data: "EntityExtractRequest"
+    ) -> "EntityExtractResponse":
+        """
+        Extract named entities and detect tone from message content.
+
+        Returns entities (people, places, URLs, emails, phones, dates)
+        with character positions and a tone classification.
+        """
+        extractor = ExtractorFactory.create_extractor()
+        result = await extractor.extract_entities(
+            content=data.content,
+            channel=data.channel.value,
+        )
+
+        return EntityExtractResponse(
+            entities=[
+                ExtractedEntityDTO(
+                    text=e.text,
+                    type=e.type.value,
+                    start=e.start,
+                    end=e.end,
+                    confidence=e.confidence,
+                )
+                for e in result.entities
+            ],
+            tone=result.tone.value if result.tone else None,
+            processing_time_ms=result.processing_time_ms,
+            extractor_used=result.extractor_used,
             channel=data.channel.value,
         )
