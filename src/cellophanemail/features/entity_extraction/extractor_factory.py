@@ -1,8 +1,8 @@
 """ExtractorFactory — environment-based entity extractor selection.
 
 Mirrors AnalyzerFactory from email_protection.
-STAGING → MockExtractor, PRIVACY_MODE → (future) LlamaExtractor,
-default → (future) AnthropicExtractor.
+STAGING → MockExtractor, PRIVACY_MODE → MockExtractor (placeholder),
+default → AnthropicExtractor (production).
 """
 
 import logging
@@ -42,15 +42,16 @@ class ExtractorFactory:
             logger.info("Creating MockExtractor (privacy placeholder)")
             return ExtractorFactory._create_mock()
 
-        # Default: production (Anthropic) — not yet built, fall back to mock
-        logger.info("Creating MockExtractor (production placeholder)")
-        return ExtractorFactory._create_mock()
+        logger.info("Creating AnthropicExtractor for production")
+        return ExtractorFactory._create_anthropic()
 
     @staticmethod
     def _create_by_type(extractor_type: str) -> IEntityExtractor:
         t = extractor_type.lower()
         if t == "mock":
             return ExtractorFactory._create_mock()
+        if t == "anthropic":
+            return ExtractorFactory._create_anthropic()
         raise ValueError(f"Unknown extractor type: {extractor_type}")
 
     @staticmethod
@@ -58,6 +59,16 @@ class ExtractorFactory:
         from .mock_extractor import MockExtractor
 
         return MockExtractor()
+
+    @staticmethod
+    def _create_anthropic() -> IEntityExtractor:
+        from .anthropic_extractor import AnthropicExtractor
+
+        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            logger.warning("ANTHROPIC_API_KEY not set, falling back to MockExtractor")
+            return ExtractorFactory._create_mock()
+        return AnthropicExtractor(api_key=api_key)
 
     @staticmethod
     def detect_environment() -> str:

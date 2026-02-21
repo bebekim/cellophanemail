@@ -1,13 +1,16 @@
-"""Tests for ExtractorFactory — RED phase.
+"""Tests for ExtractorFactory — environment-based extractor selection.
 
-Mirrors AnalyzerFactory pattern: environment-based extractor selection.
-STAGING=true → MockExtractor, default → AnthropicExtractor (not yet built).
+STAGING=true → MockExtractor, ANTHROPIC_API_KEY set → AnthropicExtractor,
+no key → fallback to MockExtractor.
 """
 
 import os
 
 import pytest
 
+from cellophanemail.features.entity_extraction.anthropic_extractor import (
+    AnthropicExtractor,
+)
 from cellophanemail.features.entity_extraction.extractor_factory import (
     ExtractorFactory,
 )
@@ -47,6 +50,16 @@ class TestExtractorFactoryExplicitType:
         extractor = ExtractorFactory.create_extractor(extractor_type="Mock")
         assert isinstance(extractor, MockExtractor)
 
+    def test_explicit_anthropic_with_key(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+        extractor = ExtractorFactory.create_extractor(extractor_type="anthropic")
+        assert isinstance(extractor, AnthropicExtractor)
+
+    def test_explicit_anthropic_no_key_falls_back(self, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        extractor = ExtractorFactory.create_extractor(extractor_type="anthropic")
+        assert isinstance(extractor, MockExtractor)
+
     def test_unknown_type_raises(self):
         with pytest.raises(ValueError, match="Unknown extractor type"):
             ExtractorFactory.create_extractor(extractor_type="nonexistent")
@@ -77,3 +90,21 @@ class TestExtractorFactoryEnvironmentDetection:
         monkeypatch.delenv("STAGING", raising=False)
         monkeypatch.setenv("PRIVACY_MODE", "true")
         assert ExtractorFactory.detect_environment() == "privacy"
+
+
+class TestExtractorFactoryProduction:
+    """Production path: AnthropicExtractor when key present, fallback otherwise."""
+
+    def test_production_with_api_key(self, monkeypatch):
+        monkeypatch.delenv("STAGING", raising=False)
+        monkeypatch.delenv("PRIVACY_MODE", raising=False)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake")
+        extractor = ExtractorFactory.create_extractor()
+        assert isinstance(extractor, AnthropicExtractor)
+
+    def test_production_no_api_key_falls_back(self, monkeypatch):
+        monkeypatch.delenv("STAGING", raising=False)
+        monkeypatch.delenv("PRIVACY_MODE", raising=False)
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        extractor = ExtractorFactory.create_extractor()
+        assert isinstance(extractor, MockExtractor)
