@@ -50,6 +50,7 @@ services:
       - UV_CACHE_DIR=/tmp/uv-cache
     volumes:
       - .:/app
+      - container_venv:/app/.venv
     depends_on:
       db:
         condition: service_healthy
@@ -72,6 +73,7 @@ services:
       - UV_CACHE_DIR=/tmp/uv-cache
     volumes:
       - .:/app
+      - container_venv:/app/.venv
     depends_on:
       db:
         condition: service_healthy
@@ -102,6 +104,7 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+      - container_venv:/app/.venv
       - /app/src/cellophanemail.egg-info  # Prevent overwriting
     depends_on:
       db:
@@ -133,6 +136,7 @@ services:
       - "2525:2525"
     volumes:
       - .:/app
+      - container_venv:/app/.venv
     depends_on:
       db:
         condition: service_healthy
@@ -166,6 +170,7 @@ services:
       - UV_CACHE_DIR=/tmp/uv-cache
     volumes:
       - .:/app
+      - container_venv:/app/.venv
     depends_on:
       db:
         condition: service_healthy
@@ -184,6 +189,7 @@ services:
 
 volumes:
   postgres_data:
+  container_venv:  # Isolates container .venv from host — prevents broken symlinks
 
 networks:
   cellophanemail:
